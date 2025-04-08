@@ -4,24 +4,26 @@
 import PackageDescription
 
 let package = Package(
-    name: "AudioBloom",
+    name: "AudioBloomAI",
     platforms: [
         .macOS(.v15)
     ],
     products: [
         // Main application
         .executable(
-            name: "AudioBloom",
+            name: "AudioBloomAI",
             targets: ["AudioBloomApp"]
         ),
         // Libraries that can be reused
+        // Libraries that can be reused
         .library(
-            name: "AudioBloomCore",
+            name: "AudioBloomAICore",
             targets: ["AudioBloomCore"]
-        ),
     ],
     dependencies: [
         // External dependencies can be added here as needed
+        .package(url: "https://github.com/apple/swift-algorithms", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
     ],
     targets: [
         // Main application target
@@ -29,10 +31,11 @@ let package = Package(
             name: "AudioBloomApp",
             dependencies: [
                 "AudioBloomCore",
-                "CoreAudio",
+                "AudioProcessor",
                 "Visualizer",
                 "MLEngine"
             ],
+            sources: ["Sources/AudioBloomApp/AudioBloomApp.swift", "Sources/AudioBloomApp/ContentView.swift"],
             resources: [
                 .process("Resources")
             ]
@@ -41,23 +44,22 @@ let package = Package(
         // Core shared functionality
         .target(
             name: "AudioBloomCore",
-            dependencies: [
-                "CoreAudio",
-                "Visualizer",
-                "MLEngine"
-            ]
+            dependencies: []
         ),
         
         // Audio processing module
         .target(
-            name: "CoreAudio",
-            dependencies: []
+            name: "AudioProcessor",
+            dependencies: ["AudioBloomCore"]
         ),
         
-        // Metal-based visualization module
         .target(
             name: "Visualizer",
-            dependencies: [],
+            dependencies: [
+                "AudioBloomCore",
+                .product(name: "Algorithms", package: "swift-algorithms"),
+                .product(name: "Numerics", package: "swift-numerics")
+            ],
             resources: [
                 .process("Resources/Shaders")
             ]
@@ -66,26 +68,32 @@ let package = Package(
         // Neural Engine integration module
         .target(
             name: "MLEngine",
-            dependencies: []
+            dependencies: [
+                "AudioBloomCore",
+                .product(name: "Numerics", package: "swift-numerics")
+            ]
         ),
         
         // Test targets
         .testTarget(
             name: "AudioBloomTests",
-            dependencies: ["AudioBloomCore"]
+            dependencies: ["AudioBloomCore"],
+            path: "Tests/AudioBloomTests"
         ),
         .testTarget(
-            name: "CoreAudioTests",
-            dependencies: ["CoreAudio"]
+            name: "AudioProcessorTests",
+            dependencies: ["AudioProcessor"],
+            path: "Tests/AudioProcessorTests"
         ),
         .testTarget(
             name: "VisualizerTests",
-            dependencies: ["Visualizer"]
+            dependencies: ["Visualizer"],
+            path: "Tests/VisualizerTests"
         ),
         .testTarget(
             name: "MLEngineTests",
-            dependencies: ["MLEngine"]
-        ),
+            dependencies: ["MLEngine"],
+            path: "Tests/MLEngineTests"
+        )
     ]
 )
-

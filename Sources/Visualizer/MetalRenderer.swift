@@ -3,7 +3,8 @@ import Metal
 import MetalKit
 import SwiftUI
 import AudioBloomCore
-
+import QuartzCore
+import CoreVideo
 /// Metal-based renderer for audio visualizations
 public class MetalRenderer: NSObject, ObservableObject, VisualizationRenderer {
     /// Published property that indicates if the renderer is ready
@@ -30,13 +31,19 @@ public class MetalRenderer: NSObject, ObservableObject, VisualizationRenderer {
     /// The MetalKit view for rendering
     private var metalView: MTKView?
     
-    /// Timer for animation
-    private var displayLink: CADisplayLink?
+    /// Display link for macOS rendering synchronization
+    private var displayLink: CVDisplayLink?
+    
+    /// Queue for handling display link callbacks
+    private let displayLinkQueue = DispatchQueue(label: "com.audiobloom.displaylink", qos: .userInteractive)
+    
+    /// Flag indicating if rendering is active
+    private var isRenderingActive = false
     
     /// Prepares the renderer for drawing
     public func prepareRenderer() {
-        // Get the default Metal device
-        guard let device = MTLDevice.default else {
+        // Get the default Metal device using the proper macOS API
+        guard let device = MTLCreateSystemDefaultDevice() else {
             print("Metal device not found")
             return
         }
@@ -188,16 +195,55 @@ public class MetalRenderer: NSObject, ObservableObject, VisualizationRenderer {
         }
     }
     
-    /// Sets up the display link for rendering
+    /// Sets up the display link for rendering on macOS
     private func setupDisplayLink() {
-        displayLink = CADisplayLink(target: self, selector: #selector(displayLinkDidFire))
-        displayLink?.preferredFramesPerSecond = AudioBloomCore.Constants.defaultFrameRate
-        displayLink?.add(to: .main, forMode: .common)
+        // Create CVDisplayLink for macOS
+        var displayLink: CVDisplayLink?
+        let error = CVDisplayLinkCreateWithActiveCGDisplays(&displayLink)
+        
+        guard error == kCVReturnSuccess, let displayLink = displayLink else {
+            print("Failed to create CVDisplayLink")
+            return
+        }
+        
+        // Set up the display link output callback
+        let displayLinkCallback: CVDisplayLinkOutputCallback = { (displayLink, inNow, inOutputTime, flagsIn, flagsOut, displayLinkContext) -> CVReturn in
+            // Get the renderer instance from the context
+            let rendererPointer = unsafeBitCast(displayLinkContext, to: MetalRenderer.self)
+            
+            // Dispatch rendering to the main thread
+            rendererPointer.displayLinkQueue.async {
+                DispatchQueue.main.async {
+                    if rendererPointer.isRenderingActive {
+                        rendererPointer.render()
+                    }
+                }
+            }
+            
+            return kCVReturnSuccess
+        }
+        
+        // Set the output callback
+        let opaqueRenderer = Unmanaged.passUnretained(self).toOpaque()
+        CVDisplayLinkSetOutputCallback(displayLink, displayLinkCallback, opaqueRenderer)
+        
+        // Start the display link
+        CVDisplayLinkStart(displayLink)
+        self.displayLink = displayLink
+        self.isRenderingActive = true
     }
     
-    /// Called when the display link fires
-    @objc private func displayLinkDidFire() {
-        render()
+    /// Stops the display link when it's no longer needed
+    private func stopDisplayLink() {
+        if let displayLink = displayLink {
+            CVDisplayLinkStop(displayLink)
+            self.displayLink = nil
+        }
+        isRenderingActive = false
+    }
+    
+    deinit {
+        stopDisplayLink()
     }
     
     /// Configures a MetalKit view for rendering
@@ -207,16 +253,36 @@ public class MetalRenderer: NSObject, ObservableObject, VisualizationRenderer {
         metalView.device = device
         metalView.clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
         metalView.colorPixelFormat = .bgra8Unorm
+        metalView.colorPixelFormat = .bgra8Unorm
         metalView.framebufferOnly = true
+        metalView.enableSetNeedsDisplay = false
+        metalView.isPaused = true  // We'll control rendering with our CVDisplayLink
         
         self.metalView = metalView
     }
 }
 
+// MARK: - CVDisplayLink support extensions
+
+extension CVDisplayLink {
+    var currentRefreshRate: Double {
+        var actualRefreshRate = CVDisplayLinkGetActualOutputVideoRefreshPeriod(self)
+        if actualRefreshRate <= 0 {
+            let period = CVDisplayLinkGetNominalOutputVideoRefreshPeriod(self)
+            actualRefreshRate = Double(period.timeScale) / Double(period.timeValue)
+        }
+        return actualRefreshRate
+    }
+}
 /// A SwiftUI wrapper for a MetalKit view
 public struct MetalView: NSViewRepresentable {
     /// The renderer to use
     public var renderer: MetalRenderer
+    
+    /// Initializes a new MetalView with the given renderer
+    public init(renderer: MetalRenderer) {
+        self.renderer = renderer
+    }
     
     /// Creates the NSView
     public func makeNSView(context: Context) -> MTKView {

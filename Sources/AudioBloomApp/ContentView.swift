@@ -3,6 +3,7 @@ import AudioBloomCore
 import CoreAudio
 import Visualizer
 import MLEngine
+import AudioProcessor
 
 /// Main content view for the application
 struct ContentView: View {
@@ -135,6 +136,90 @@ struct ControlPanelView: View {
     }
 }
 
+/// Settings panel view for adjusting visualization parameters
+struct SettingsPanelView: View {
+    /// Binding for visibility control
+    @Binding var isVisible: Bool
+    
+    /// Application settings
+    @EnvironmentObject var settings: AudioBloomSettings
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Text("Settings")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                Button(action: {
+                    isVisible = false
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title3)
+                }
+            }
+            .padding(.bottom)
+            
+            Group {
+                VStack(alignment: .leading) {
+                    Text("Theme")
+                        .fontWeight(.medium)
+                    
+                    Picker("Theme", selection: $settings.currentTheme) {
+                        ForEach(AudioBloomCore.VisualTheme.allCases) { theme in
+                            Text(theme.rawValue).tag(theme)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                }
+                
+                Toggle("Enable Neural Engine", isOn: $settings.neuralEngineEnabled)
+                
+                VStack(alignment: .leading) {
+                    Text("Target Frame Rate: \(settings.frameRateTarget)")
+                        .fontWeight(.medium)
+                    
+                    Slider(value: Binding(
+                        get: { Double(settings.frameRateTarget) },
+                        set: { settings.frameRateTarget = Int($0) }
+                    ), in: 30...120, step: 10)
+                }
+            }
+            
+            Spacer()
+        }
+        .padding()
+        .frame(maxHeight: .infinity)
+        .foregroundColor(.white)
+    }
+}
+
+/// Audio level bar visualization component
+struct AudioLevelBar: View {
+    /// The current level (0-1)
+    var level: CGFloat
+    
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(levelColor)
+            .frame(width: 6, height: 20 * level)
+            .frame(height: 20, alignment: .bottom)
+    }
+    
+    /// Color based on level
+    private var levelColor: Color {
+        if level < 0.3 {
+            return .green
+        } else if level < 0.7 {
+            return .yellow
+        } else {
+            return .red
+        }
+    }
+}
+
 /// Audio levels visualization
 struct AudioLevelsView: View {
     /// Reference to the audio engine
@@ -152,5 +237,17 @@ struct AudioLevelsView: View {
     
     /// Calculate the level for a specific bar
     private func barLevel(at index: Int) -> CGFloat {
-        let avgLevel = (audioEngine.levels.left + audioEngine.levels.right)
-
+        let avgLevel = (audioEngine.levels.left + audioEngine.levels.right) / 2.0
+        
+        // Create a logarithmic distribution for the bars
+        // Lower index bars show lower frequency activity
+        let threshold = Float(index) * 0.1 + 0.05
+        
+        // Check if the level exceeds the threshold for this bar
+        if avgLevel > threshold {
+            return CGFloat(min(1.0, (avgLevel - threshold) * 2.0))
+        } else {
+            return 0.0
+        }
+    }
+}
