@@ -41,8 +41,9 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-algorithms", from: "1.2.1"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.3"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.6.3"),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.19.0"),
-        .package(url: "https://github.com/AudioKit/AudioKit", from: "5.6.5")
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", exact: "1.8.0"),
+        .package(url: "https://github.com/AudioKit/AudioKit", from: "5.6.5"),
+        .package(url: "https://github.com/apple/swift-syntax", exact: "509.0.2")
     ],
     targets: [
         // Main application target
@@ -78,7 +79,8 @@ let package = Package(
             dependencies: [
                 "AudioBloomCore",
                 .product(name: "Numerics", package: "swift-numerics"),
-                .product(name: "AudioKit", package: "AudioKit")
+                .product(name: "AudioKit", package: "AudioKit"),
+                .product(name: "Logging", package: "swift-log")
             ],
             exclude: ["README.md"],
             swiftSettings: [
@@ -96,8 +98,10 @@ let package = Package(
             name: "Visualizer",
             dependencies: [
                 "AudioBloomCore",
+                "AudioProcessor",
                 .product(name: "Algorithms", package: "swift-algorithms"),
-                .product(name: "Numerics", package: "swift-numerics")
+                .product(name: "Numerics", package: "swift-numerics"),
+                .product(name: "Logging", package: "swift-log")
             ],
             exclude: ["README.md"], // Removed MetalRenderer.swift from exclusions
             resources: [
@@ -150,11 +154,20 @@ let package = Package(
                 "AudioBloomCore",
                 "MLEngine",
                 "Visualizer",
-                .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
+                "AudioProcessor",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture"),
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "Logging", package: "swift-log")
             ],
             exclude: ["README.md"], // Removed PresetControlsView.swift from exclusions
             swiftSettings: [
-                // Any swift settings would go here
+                .enableExperimentalFeature("StrictConcurrency"),
+                .enableUpcomingFeature("BareSlashRegexLiterals"),
+                .enableUpcomingFeature("ConciseMagicFile"),
+                .enableUpcomingFeature("ForwardTrailingClosures"),
+                .enableUpcomingFeature("ExistentialAny"),
+                .enableUpcomingFeature("InferSendableFromCaptures"),
+                .enableUpcomingFeature("IsolatedDefaultValues")
             ],
             linkerSettings: [
                 .linkedFramework("SwiftUI", .when(platforms: [.macOS])),
@@ -193,5 +206,7 @@ let package = Package(
             path: "Tests/AudioBloomUITests"
         )
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageModes: [.version("6")],
+    cLanguageStandard: .c11, 
+    cxxLanguageStandard: .cxx14
 )
