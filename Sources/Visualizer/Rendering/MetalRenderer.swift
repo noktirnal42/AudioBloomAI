@@ -582,5 +582,375 @@ public class MetalRenderer {
     /// Set audio levels for visualization
     /// - Parameters:
     ///   - bass: Bass frequency level (0.0-1.0)
-    ///   - mid: Mid frequency level (0.0-1.0)
-    ///   - treble: Tre
+    /// Manually set audio levels (for testing or custom input)
+    /// - Parameters:
+    ///   - bass: Bass level (0.0-1.0)
+    ///   - mid: Mid level (0.0-1.0)
+    ///   - treble: Treble level (0.0-1.0)
+    ///   - left: Left channel level (0.0-1.0)
+    ///   - right: Right channel level (0.0-1.0)
+    public func setAudioLevels(bass: Float, mid: Float, treble: Float, left: Float, right: Float) {
+        self.bassLevel = bass
+        self.midLevel = mid
+        self.trebleLevel = treble
+        self.leftLevel = left
+        self.rightLevel = right
+    }
+    
+    /// Set neural parameters for visualization
+    /// - Parameters:
+    ///   - energy: Energy level (0.0-1.0)
+    ///   - pleasantness: Pleasantness factor (0.0-1.0)
+    ///   - complexity: Complexity factor (0.0-1.0)
+    ///   - beatDetected: Beat detection status (0.0 or 1.0)
+    public func setNeuralParameters(energy: Float, pleasantness: Float, complexity: Float, beatDetected: Float) {
+        self.neuralEnergy = energy
+        self.neuralPleasantness = pleasantness
+        self.neuralComplexity = complexity
+        self.beatDetected = beatDetected
+    }
+    
+    /// Set visualization parameters
+    /// - Parameters:
+    ///   - sensitivity: Audio sensitivity (0.0-1.0)
+    ///   - motionIntensity: Motion intensity (0.0-1.0)
+    ///   - colorIntensity: Color intensity (0.0-1.0)
+    public func setVisualizationParameters(sensitivity: Float = 0.8,
+                                          motionIntensity: Float = 0.7,
+                                          colorIntensity: Float = 0.8) {
+        self.sensitivity = sensitivity
+        self.motionIntensity = motionIntensity
+        self.colorIntensity = colorIntensity
+    }
+    
+    /// Set theme colors for visualization
+    /// - Parameters:
+    ///   - primary: Primary color
+    ///   - secondary: Secondary color
+    ///   - background: Background color
+    ///   - accent: Accent color
+    public func setCustomColors(primary: SIMD4<Float>, secondary: SIMD4<Float>,
+                              background: SIMD4<Float>, accent: SIMD4<Float>) {
+        self.primaryColor = primary
+        self.secondaryColor = secondary
+        self.backgroundColor = background
+        self.accentColor = accent
+    }
+    
+    /// Set the theme for visualization
+    /// - Parameter themeIndex: Theme index (0: Classic, 1: Neon, 2: Monochrome, 3: Cosmic)
+    public func setTheme(_ themeIndex: Float) {
+        self.themeIndex = themeIndex
+    }
+    
+    /// Set the visualization mode
+    /// - Parameter mode: Visualization mode (0: Spectrum, 1: Waveform, 2: Particles, 3: Neural)
+    public func setVisualizationMode(_ mode: VisualizationMode) {
+        // Store the current mode as the previous mode for transitions
+        if currentVisualizationMode != Float(mode.rawValue) {
+            previousVisualizationMode = currentVisualizationMode
+            currentVisualizationMode = Float(mode.rawValue)
+            
+            // Start transition
+            startTransition()
+        }
+    }
+    
+    /// Start a transition between visualization modes
+    private func startTransition() {
+        isInTransition = true
+        transitionProgress = 0.0
+        transitionStartTime = CACurrentMediaTime()
+    }
+    
+    /// Update visualization parameters based on a dictionary of values
+    /// - Parameter parameters: Dictionary of parameter names and values
+    public func updateParameters(_ parameters: [String: Any]) {
+        for (key, value) in parameters {
+            switch key {
+            case "sensitivity":
+                if let value = value as? Float {
+                    sensitivity = value
+                }
+            case "motionIntensity":
+                if let value = value as? Float {
+                    motionIntensity = value
+                }
+            case "colorIntensity":
+                if let value = value as? Float {
+                    colorIntensity = value
+                }
+            case "spectrumSmoothing":
+                if let value = value as? Float {
+                    spectrumSmoothing = value
+                }
+            case "themeIndex":
+                if let value = value as? Float {
+                    themeIndex = value
+                } else if let value = value as? Int {
+                    themeIndex = Float(value)
+                }
+            case "primaryColor":
+                if let value = value as? SIMD4<Float> {
+                    primaryColor = value
+                }
+            case "secondaryColor":
+                if let value = value as? SIMD4<Float> {
+                    secondaryColor = value
+                }
+            case "backgroundColor":
+                if let value = value as? SIMD4<Float> {
+                    backgroundColor = value
+                }
+            case "accentColor":
+                if let value = value as? SIMD4<Float> {
+                    accentColor = value
+                }
+            case "neuralEnergy":
+                if let value = value as? Float {
+                    neuralEnergy = value
+                }
+            case "neuralPleasantness":
+                if let value = value as? Float {
+                    neuralPleasantness = value
+                }
+            case "neuralComplexity":
+                if let value = value as? Float {
+                    neuralComplexity = value
+                }
+            case "beatDetected":
+                if let value = value as? Float {
+                    beatDetected = value
+                } else if let value = value as? Bool {
+                    beatDetected = value ? 1.0 : 0.0
+                }
+            default:
+                break
+            }
+        }
+    }
+    
+    // MARK: - Resource Management
+    
+    /// Reset audio data to default values
+    private func resetAudioData() {
+        // Clear audio data buffer
+        for i in 0..<audioData.count {
+            audioData[i] = 0.0
+        }
+        
+        // Reset audio levels
+        bassLevel = 0.0
+        midLevel = 0.0
+        trebleLevel = 0.0
+        leftLevel = 0.0
+        rightLevel = 0.0
+        
+        // Reset neural parameters
+        neuralEnergy = 0.5
+        neuralPleasantness = 0.5
+        neuralComplexity = 0.5
+        beatDetected = 0.0
+    }
+    
+    /// Release Metal resources
+    private func releaseResources() {
+        // Reset state
+        renderPipelineState = nil
+        vertexBuffer = nil
+        uniformBuffer = nil
+        commandQueue = nil
+        device = nil
+    }
+    
+    deinit {
+        // Ensure resources are released when object is deallocated
+        releaseResources()
+    }
+}
+
+// MARK: - Visualization Mode Enum
+
+/// Available visualization modes
+public enum VisualizationMode: Int, CaseIterable, Identifiable {
+    /// Frequency spectrum visualization
+    case spectrum = 0
+    
+    /// Waveform visualization
+    case waveform = 1
+    
+    /// Particle visualization
+    case particles = 2
+    
+    /// Neural visualization
+    case neural = 3
+    
+    public var id: Int { self.rawValue }
+    
+    /// User-friendly name for display
+    public var name: String {
+        switch self {
+        case .spectrum:
+            return "Spectrum"
+        case .waveform:
+            return "Waveform"
+        case .particles:
+            return "Particles"
+        case .neural:
+            return "Neural"
+        }
+    }
+}
+
+// MARK: - Metal View Implementation
+
+/// SwiftUI wrapper for Metal rendering
+public struct MetalView: NSViewRepresentable {
+    /// The Metal renderer to use
+    private let renderer: MetalRenderer
+    
+    /// Initialize the Metal view
+    /// - Parameter renderer: The Metal renderer to use
+    public init(renderer: MetalRenderer) {
+        self.renderer = renderer
+    }
+    
+    /// Create the NSView
+    public func makeNSView(context: Context) -> MTKView {
+        let mtkView = MTKView()
+        mtkView.delegate = context.coordinator
+        mtkView.device = context.coordinator.renderer.device
+        
+        // Configure view
+        mtkView.colorPixelFormat = .bgra8Unorm
+        mtkView.framebufferOnly = true
+        mtkView.clearColor = MTLClearColor(red: 0.0, green: 0.0, blue: 0.0, alpha: 1.0)
+        mtkView.enableSetNeedsDisplay = false
+        mtkView.isPaused = false
+        mtkView.preferredFramesPerSecond = 60
+        
+        return mtkView
+    }
+    
+    /// Update the NSView
+    public func updateNSView(_ nsView: MTKView, context: Context) {
+        // Update only if necessary
+    }
+    
+    /// Create the coordinator
+    public func makeCoordinator() -> Coordinator {
+        Coordinator(renderer: renderer)
+    }
+    
+    /// Coordinator for handling MTKViewDelegate callbacks
+    public class Coordinator: NSObject, MTKViewDelegate {
+        /// The Metal renderer
+        let renderer: MetalRenderer
+        
+        /// Initialize the coordinator
+        /// - Parameter renderer: The Metal renderer to use
+        init(renderer: MetalRenderer) {
+            self.renderer = renderer
+            super.init()
+        }
+        
+        /// Handle draw request
+        public func draw(in view: MTKView) {
+            // Skip drawing if no drawable is available
+            guard let drawable = view.currentDrawable,
+                  let renderPassDescriptor = view.currentRenderPassDescriptor else {
+                return
+            }
+            
+            // Update viewport size if needed
+            let viewportSize = view.drawableSize
+            renderer.setViewportSize(viewportSize)
+            
+            // Render to drawable
+            renderer.render(to: drawable, with: renderPassDescriptor)
+        }
+        
+        /// Handle view size change
+        public func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+            // Update renderer viewport size
+            renderer.setViewportSize(size)
+        }
+    }
+}
+
+// MARK: - Audio Uniform Structure
+
+/// Uniform structure for audio visualization shaders
+private struct AudioUniforms {
+    /// FFT frequency data
+    var audioData: [Float] = Array(repeating: 0, count: 1024)
+    
+    /// Low frequency intensity
+    var bassLevel: Float = 0.0
+    
+    /// Mid frequency intensity
+    var midLevel: Float = 0.0
+    
+    /// High frequency intensity
+    var trebleLevel: Float = 0.0
+    
+    /// Left channel volume
+    var leftLevel: Float = 0.0
+    
+    /// Right channel volume
+    var rightLevel: Float = 0.0
+    
+    /// Primary theme color
+    var primaryColor: SIMD4<Float> = SIMD4<Float>(1.0, 0.3, 0.7, 1.0)
+    
+    /// Secondary theme color
+    var secondaryColor: SIMD4<Float> = SIMD4<Float>(0.2, 0.8, 1.0, 1.0)
+    
+    /// Background color
+    var backgroundColor: SIMD4<Float> = SIMD4<Float>(0.05, 0.05, 0.1, 1.0)
+    
+    /// Accent color for highlights
+    var accentColor: SIMD4<Float> = SIMD4<Float>(1.0, 0.8, 0.2, 1.0)
+    
+    /// Current time in seconds
+    var time: Float = 0.0
+    
+    /// Audio sensitivity (0.0-1.0)
+    var sensitivity: Float = 0.8
+    
+    /// Motion intensity (0.0-1.0)
+    var motionIntensity: Float = 0.7
+    
+    /// Current theme index (0-7 for different themes)
+    var themeIndex: Float = 0.0
+    
+    /// Current visualization mode (0: Spectrum, 1: Waveform, 2: Particles, 3: Neural)
+    var visualizationMode: Float = 0.0
+    
+    /// Previous visualization mode for transitions
+    var previousMode: Float = 0.0
+    
+    /// Progress between mode transitions (0.0-1.0)
+    var transitionProgress: Float = 0.0
+    
+    /// Color intensity for visualization effects (0.0-1.0)
+    var colorIntensity: Float = 0.8
+    
+    /// Smoothing factor for spectrum visualization (0.0-1.0)
+    var spectrumSmoothing: Float = 0.3
+    
+    /// Number of particles to render in particle visualization mode
+    var particleCount: Float = 50.0
+    
+    /// Neural energy parameter (0.0-1.0)
+    var neuralEnergy: Float = 0.5
+    
+    /// Neural pleasantness parameter (0.0-1.0)
+    var neuralPleasantness: Float = 0.5
+    
+    /// Neural complexity parameter (0.0-1.0)
+    var neuralComplexity: Float = 0.5
+    
+    /// Beat detection indicator (0.0 = no beat, 1.0 = beat detected)
+    var beatDetected: Float = 0.0
+}
