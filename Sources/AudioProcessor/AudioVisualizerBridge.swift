@@ -644,22 +644,57 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     // MARK: - Integration Methods
-    
     /// Prepares the bridge with the AudioProcessor
     /// - Parameter audioProcessor: The audio processor to integrate with
-    public func prepare(with audioProcessor: AudioEngine)
+    public func prepare(with audioProcessor: AudioEngine) {
+        // Subscribe to audio data from the engine
+        subscribeToAudioEngine(audioProcessor)
+        
+        // Initialize or reinitialize processing filters based on current configuration
+        initializeProcessingFilters()
+        
+        // Initialize frequency bands
+        initializeFrequencyBands()
+        
+        // Reset state variables
+        lastRawFrequencyData = []
+        lastRawLevels = (0, 0)
+        smoothedFrequencyData = []
+        energyHistory = Array(repeating: 0, count: 43)
+        lastBeatTime = 0
+        beatIntervals = []
+        
+        // Reset beat detection state
+        DispatchQueue.main.async {
+            self.beatDetected = false
+        }
+        
+        print("AudioVisualizerBridge prepared successfully with AudioEngine")
+    }
+    
+    /// Process neural insights from ML processing
+    /// - Parameter neuralResponse: Neural processing response from ML analysis
+    public func processNeuralInsights(_ neuralResponse: NeuralProcessingResponse) {
+        // Apply neural insights to the visualization parameters based on weighting
+        let weight = self.configuration.neuralProcessingWeight
+        
+        // Blend neural energy with signal-based energy
+        self.energyLevel = self.energyLevel * (1.0 - weight) + neuralResponse.energy * weight
+        
+        // Apply beat detection if neural system detected it
+        if neuralResponse.beatDetected && !self.beatDetected {
+            DispatchQueue.main.async {
+                self.beatDetected = true
+                
+                // Auto-reset beat flag after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     self.beatDetected = false
                 }
             }
-            
-            // Apply neural insights to the visualization parameters based on weighting
-            let weight = self.configuration.neuralProcessingWeight
-            
-            // Blend neural energy with signal-based energy
-            self.energyLevel = self.energyLevel * (1.0 - weight) + neuralResponse.energy * weight
-            
-            // Additional visualization parameters could be adjusted here
         }
+        
+        // Additional visualization parameters could be adjusted here
+    }
     }
     
     /// Sets the visualization resolution
