@@ -1,20 +1,52 @@
 import SwiftUI
-import AudioBloomCore
-import CoreAudio
-import Visualizer
-import MLEngine
 import AudioProcessor
+import MLEngine
+import Visualizer
+import AudioBloomCore
+import Combine
 
-/// Main content view for the application
 struct ContentView: View {
-    /// Application settings
-    @EnvironmentObject var settings: AudioBloomSettings
-    
-    /// Reference to the audio engine
+    // Access environment objects
     @EnvironmentObject var audioEngine: AudioEngine
+    @EnvironmentObject var audioBridge: AudioBridge
     
-    /// Reference to the Metal renderer
-    @EnvironmentObject var renderer: MetalRenderer
+    // State for visualization data
+    @State private var visualizationData: VisualizationData?
+    @State private var frequencyData: [Float] = []
+    @State private var audioLevels: (left: Float, right: Float) = (0, 0)
+    
+    // Subscriptions
+    @State private var cancellables = Set<AnyCancellable>()
+    
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("AudioBloom AI")
+                .font(.largeTitle)
+                .padding()
+            
+            // Audio levels display
+            HStack(spacing: 20) {
+                LevelMeterView(level: audioLevels.left)
+                    .frame(width: 30, height: 200)
+                
+                // Visualization area
+                ZStack {
+                    // Primary visualization
+                    FrequencyVisualizationView(data: visualizationData?.values ?? frequencyData)
+                        .frame(height: 200)
+                        .background(Color.black.opacity(0.1))
+                        .cornerRadius(10)
+                    
+                    // Beat indicator (if significant event detected)
+                    if visualizationData?.isSignificantEvent == true {
+                        Circle()
+                            .fill(Color.red.opacity(0.7))
+                            .frame(width: 20, height: 20)
+                            .position(x: 20, y: 20)
+                    }
+                }
+                
+                LevelMeterView(level: audioLevels.right)
     
     /// Reference to the ML processor
     @EnvironmentObject var mlProcessor: MLProcessor

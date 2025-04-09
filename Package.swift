@@ -24,6 +24,7 @@ let package = Package(
         // External dependencies can be added here as needed
         .package(url: "https://github.com/apple/swift-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
     ],
     targets: [
         // Main application target
@@ -70,7 +71,16 @@ let package = Package(
             name: "MLEngine",
             dependencies: [
                 "AudioBloomCore",
-                .product(name: "Numerics", package: "swift-numerics")
+                .product(name: "Numerics", package: "swift-numerics"),
+                .product(name: "Logging", package: "swift-log")
+            ],
+
+            resources: [
+                .process("Resources/Models")
+            ],
+            swiftSettings: [
+                .unsafeFlags(["-Xfrontend", "-enable-experimental-cxx-interop"]),
+                .define("ENABLE_NEURAL_ENGINE", .when(platforms: [.macOS]))
             ]
         ),
         
