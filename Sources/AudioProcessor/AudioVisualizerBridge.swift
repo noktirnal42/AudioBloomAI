@@ -282,18 +282,45 @@ public class AudioVisualizerBridge: ObservableObject {
     // MARK: - Public Methods
     
     /// Subscribes to audio data from an AudioEngine
+    /// Subscribes to audio data from an AudioEngine
     /// - Parameter audioEngine: The audio engine to subscribe to
     public func subscribeToAudioEngine(_ audioEngine: AudioDataProvider) {
         // Cancel any existing subscription
         audioDataSubscription?.cancel()
         
         // Subscribe to the audio data publisher
-        audioDataSubscription = audioEngine.getAudioDataPublisher()
-            .publisher
-            .sink { [weak self] (frequencyData, levels) in
-                self?.processAudioData(frequencyData: frequencyData, levels: levels)
+        do {
+            if let engine = audioEngine as? AudioEngine {
+                // Handle AudioEngine implementation
+                audioDataSubscription = engine.getAudioDataPublisher()
+                    .publisher
+                    .sink { [weak self] (frequencyData, levels) in
+                        self?.processAudioData(frequencyData: frequencyData, levels: levels)
+                    }
+                print("Successfully subscribed to AudioEngine data publisher")
+            } else if let processor = audioEngine as? AudioVisualizerProcessor {
+                // Handle AudioVisualizerProcessor implementation
+                let publisher = processor.getAudioDataPublisher().0
+                audioDataSubscription = publisher
+                    .sink { [weak self] visualizationData in
+                        self?.processAudioData(
+                            frequencyData: visualizationData.frequencyData,
+                            levels: visualizationData.levels
+                        )
+                    }
+                print("Successfully subscribed to AudioVisualizerProcessor data publisher")
+            } else {
+                // Generic fallback using AudioDataProvider protocol
+                audioDataSubscription = audioEngine.getAudioDataPublisher()
+                    .publisher
+                    .sink { [weak self] (frequencyData, levels) in
+                        self?.processAudioData(frequencyData: frequencyData, levels: levels)
+                    }
+                print("Successfully subscribed to generic AudioDataProvider")
             }
-    }
+        } catch {
+            print("Error subscribing to audio data: \(error.localizedDescription)")
+        }
     
     /// Processes new audio data for visualization
     /// - Parameters:
@@ -644,22 +671,88 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     // MARK: - Integration Methods
-    
     /// Prepares the bridge with the AudioProcessor
     /// - Parameter audioProcessor: The audio processor to integrate with
-    public func prepare(with audioProcessor: AudioEngine)
+    public func prepare(with audioProcessor: AudioEngine) {
+        print("Preparing AudioVisualizerBridge with AudioEngine...")
+        
+        // Cancel any existing subscription to avoid memory leaks
+        audioDataSubscription?.cancel()
+        
+        // Subscribe to the audio data from the engine
+        subscribeToAudioEngine(audioProcessor)
+        
+        // Initialize or reinitialize processing filters based on current configuration
+        initializeProcessingFilters()
+        
+        // Initialize frequency bands
+        initializeFrequencyBands()
+        
+        // Reset state variables
+        lastRawFrequencyData = []
+        lastRawLevels = (0, 0)
+        smoothedFrequencyData = []
+        energyHistory = Array(repeating: 0, count: 43)
+        lastBeatTime = 0
+        beatIntervals = []
+        
+        // Reset beat detection state
+        DispatchQueue.main.async {
+            self.beatDetected = false
+        }
+        
+        print("AudioVisualizerBridge preparation complete")
+    }
+    
+    /// Cleans up resources used by the bridge
+    public func cleanup() {
+        print("Cleaning up AudioVisualizerBridge resources...")
+        
+        // Cancel subscriptions
+        audioDataSubscription?.cancel()
+        audioDataSubscription = nil
+        
+        // Clear data buffers
+        lastRawFrequencyData = []
+        smoothedFrequencyData = []
+        energyHistory = []
+        beatIntervals = []
+        
+        // Reset state
+        DispatchQueue.main.async {
+            self.beatDetected = false
+            self.visualizationData = []
+            self.smoothedLevels = (0, 0)
+            self.frequencyBands = AudioFrequencyBands()
+            self.energyLevel = 0.0
+        }
+        
+        print("AudioVisualizerBridge cleanup complete")
+    }
+    
+    /// Process neural insights from ML processing
+    /// - Parameter neuralResponse: Neural processing response from ML analysis
+    public func processNeuralInsights(_ neuralResponse: NeuralProcessingResponse) {
+        // Apply neural insights to the visualization parameters based on weighting
+        let weight = self.configuration.neuralProcessingWeight
+        
+        // Blend neural energy with signal-based energy
+        self.energyLevel = self.energyLevel * (1.0 - weight) + neuralResponse.energy * weight
+        
+        // Apply beat detection if neural system detected it
+        if neuralResponse.beatDetected && !self.beatDetected {
+            DispatchQueue.main.async {
+                self.beatDetected = true
+                
+                // Auto-reset beat flag after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     self.beatDetected = false
                 }
             }
-            
-            // Apply neural insights to the visualization parameters based on weighting
-            let weight = self.configuration.neuralProcessingWeight
-            
-            // Blend neural energy with signal-based energy
-            self.energyLevel = self.energyLevel * (1.0 - weight) + neuralResponse.energy * weight
-            
-            // Additional visualization parameters could be adjusted here
         }
+        
+        // Additional visualization parameters could be adjusted here
+    }
     }
     
     /// Sets the visualization resolution

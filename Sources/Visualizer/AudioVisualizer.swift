@@ -90,8 +90,12 @@ public class AudioVisualizer {
     
     #if canImport(AudioProcessor)
     /// Connect to the audio processor for real-time updates
+    /// Connect to the audio processor for real-time updates
     /// - Parameter audioProcessor: The audio processor instance
     public func connectToAudioProcessor(_ audioProcessor: AudioEngine) {
+        // Cancel existing subscriptions first
+        audioSubscriptions.removeAll()
+        
         // Subscribe to frequency data updates
         audioProcessor.frequencyDataPublisher
             .receive(on: DispatchQueue.main)
@@ -130,8 +134,15 @@ public class AudioVisualizer {
                 }
             }
             .store(in: &audioSubscriptions)
+        
+        print("AudioVisualizer successfully connected to AudioEngine")
     }
-    #endif
+    
+    /// Disconnect from audio processor and clean up resources
+    public func disconnectFromAudioProcessor() {
+        audioSubscriptions.removeAll()
+        print("AudioVisualizer disconnected from AudioEngine")
+    }
     
     // MARK: - Internal Methods for View Integration
     
