@@ -1,0 +1,15 @@
+blank_issues_enabled: false
+contact_links:
+  - name: AudioBloomAI Documentation
+    url: https://github.com/noktirnal42/AudioBloomAI/wiki
+    about: Check our documentation before creating an issue
+  - name: AudioBloomAI Discussions
+    url: https://github.com/noktirnal42/AudioBloomAI/discussions
+    about: Please ask and answer questions here
+  - name: AudioBloomAI Development Guide
+    url: https://github.com/noktirnal42/AudioBloomAI/blob/main/DEVELOPMENT.md
+    about: Review our development guidelines before contributing
+  - name: Support Request
+    url: https://github.com/noktirnal42/AudioBloomAI/discussions/categories/support
+    about: Please use the discussions forum for support requests
+
