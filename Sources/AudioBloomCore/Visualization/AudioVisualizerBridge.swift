@@ -763,3 +763,6 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
             // For particles and neural patterns, we provide frequency data
             // as they typically need frequency information for reactivity
             return spectrumData
+        }
+    }
+}

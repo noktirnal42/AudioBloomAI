@@ -8,122 +8,224 @@ import QuartzCore
 import MetalKit
 import Logging
 
+/// Audio data structure representing an audio buffer and its properties
+public struct AudioData: Sendable {
+    /// The audio samples
+    public let samples: [Float]
+    
+    /// Audio levels (left and right channels)
+    public let levels: (left: Float, right: Float)
+    
+    /// Sample rate of the audio
+    public let sampleRate: Double
+    
+    /// Timestamp when the audio was captured
+    public let timestamp: Date
+    
+    /// Frequency spectrum data (if available)
+    public var frequencyData: [Float] = []
+    
+    public init(
+        samples: [Float],
+        levels: (left: Float, right: Float),
+        sampleRate: Double,
+        timestamp: Date = Date(),
+        frequencyData: [Float] = []
+    ) {
+        self.samples = samples
+        self.levels = levels
+        self.sampleRate = sampleRate
+        self.timestamp = timestamp
+        self.frequencyData = frequencyData
+    }
+    
+    /// Initializes with just frequency data (for compatibility)
+    public init(frequencyData: [Float], levels: (left: Float, right: Float), timestamp: Date = Date()) {
+        self.samples = []
+        self.levels = levels
+        self.sampleRate = 44100 // default
+        self.timestamp = timestamp
+        self.frequencyData = frequencyData
+    }
+}
+
+/// Protocol for objects that provide audio data
+public protocol AudioDataProvider: AnyObject, Sendable {
+    /// Publisher for audio data updates
+    var audioDataPublisher: AnyPublisher<AudioData, Never> { get }
+    
+    /// Current audio levels (e.g., left and right channel levels)
+    var levels: (left: Float, right: Float) { get }
+    
+    /// Current frequency spectrum data
+    var frequencyData: [Float] { get }
+}
+
+/// Protocol for ML processing integration
+public protocol MLProcessorProtocol: AnyObject, Sendable {
+    /// Whether the processor is ready for processing
+    var isReady: Bool { get }
+    
+    /// Process audio data for ML analysis
+    /// - Parameter audioData: The audio data to analyze
+    /// - Returns: Analysis results
+    func processAudio(_ audioData: AudioData) throws -> [String: Any]
+    
+    /// Processes raw audio data
+    /// - Parameter audioData: The raw audio data to process
+    /// - Throws: Error if processing fails
+    func processAudioData(_ audioData: [Float]) async throws
+    
+    /// Publisher for visualization data
+    var visualizationDataPublisher: AnyPublisher<VisualizationData, Never> { get }
+}
+
 /// Bridge connecting audio data providers to ML processors
 public final class AudioBridge: @unchecked Sendable {
     // MARK: - Types
     
     /// Connection state of the bridge
-    public enum ConnectionState: String {
+    public enum ConnectionState: String, Sendable {
         case disconnected
         case connecting
         case connected
-        case active
         case inactive
-        case error
+        case active
     }
     
-    /// Errors that can occur in the audio bridge
-    public enum AudioBridgeError: Error, CustomStringConvertible {
+    /// Error types that can occur in the bridge
+    public enum AudioBridgeError: Error, CustomStringConvertible, Sendable {
+        case connectionFailed
         case dataConversionFailed
-        case connectionFailed(String)
-        case streamingFailed(String)
-        case processingFailed(String)
+        case processingFailed
         
+        /// Description of the error
         public var description: String {
             switch self {
-            case .dataConversionFailed: 
+            case .connectionFailed:
+                return "Failed to connect to audio provider"
+            case .dataConversionFailed:
                 return "Failed to convert audio data"
-            case .connectionFailed(let details):
-                return "Connection failed: \(details)"
-            case .streamingFailed(let details):
-                return "Streaming failed: \(details)"
-            case .processingFailed(let details):
-                return "Processing failed: \(details)"
+            case .processingFailed:
+                return "Failed to process audio data"
             }
         }
     }
     
+    /// Data for real-time visualization
+    public struct VisualizationData: Sendable {
+        /// Values to visualize (typically frequency spectrum)
+        public let values: [Float]
+        
+        /// Whether this data represents a significant event
+        public let isSignificantEvent: Bool
+        
+        /// Timestamp of the data
+        public let timestamp: Date
+        
+        /// Initializes a new visualization data instance
+        /// - Parameters:
+        ///   - values: Values to visualize
+        ///   - isSignificantEvent: Whether this is a significant event
+        ///   - timestamp: Timestamp of the data
+        public init(values: [Float], isSignificantEvent: Bool = false, timestamp: Date = Date()) {
+            self.values = values
+            self.isSignificantEvent = isSignificantEvent
+            self.timestamp = timestamp
+        }
+    }
+    
     /// Performance metrics for the audio bridge
-    public struct PerformanceMetrics: Sendable {
+    public struct PerformanceMetrics: Sendable, Equatable {
         public var framesPerSecond: Double = 0
         public var eventsPerMinute: Double = 0
+        public var averageLatency: Double = 0
         public var errorRate: Double = 0
         public var averageProcessingTime: Double = 0
-        public var conversionEfficiency: Double = 0
-        
-        public init() {}
+        public var conversionEfficiency: Double = 1.0
     }
     
     // MARK: - Properties
     
+    /// Bridge version
+    public static let version = "1.2.0"
+    
     /// Logger instance
     private let logger = Logger(label: "com.audiobloom.bridge")
+    
     /// The audio data provider
     private weak var audioProvider: AudioDataProvider?
     
     /// Subscription to audio data
     private var audioDataSubscription: AnyCancellable?
     
-    /// Subscription to ML visualization data
-    private var mlVisualizationSubscription: AnyCancellable?
+    /// Processing queue
+    private let processingQueue = DispatchQueue(label: "com.audiobloom.bridge.processing", qos: .userInteractive)
     
     /// Current connection state
     private var connectionState: ConnectionState = .disconnected
     
     /// Audio processing queue
-    private let processingQueue = DispatchQueue(label: "com.audiobloom.bridge", qos: .userInteractive)
-    
-    /// Format converter for audio processing
-    private let formatConverter: FormatConverter
+    private let audioQueue = DispatchQueue(label: "com.audiobloom.bridge.audio", qos: .userInteractive)
     
     /// Audio ML processor for AI analysis
     private let mlProcessor: MLProcessorProtocol
     
+    /// Performance tracker for monitoring
+    /// Performance tracker for monitoring
+    private let performanceTracker = PerformanceTracker()
+    
     /// Publisher for visualization data
     private let visualizationSubject = PassthroughSubject<VisualizationData, Never>()
-    
-    /// Thread safety lock
-    private let lock = NSLock()
-    
-    // MARK: - FFT Properties
-    
-    /// FFT setup for frequency analysis
+    /// FFT setup for audio processing
     private var fftSetup: OpaquePointer?
     
-    /// Window buffer for FFT processing
-    private var windowBuffer = [Float]()
+    /// Window buffer for audio processing
+    private var windowBuffer: [Float]?
     
-    /// FFT size for processing (power of 2)
+    /// Standard FFT size for audio processing
     private let fftSize = 1024
     
-    // MARK: - Performance Tracking Properties
+    /// Standard frequency size for visualization
+    private let standardFrequencySize = 128
     
-    /// Number of frames processed
-    private var frameCount: Int = 0
+    /// Lock for thread safety
+    private let lock = NSLock()
     
-    /// Total processing time (seconds)
-    private var totalProcessingTime: Double = 0
+    /// Input format for audio processing
+    private var inputFormat = AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 2)!
     
-    /// Recent processing times (seconds)
-    private var recentProcessingTimes: [Double] = []
+    /// Performance tracking start time
+    private var trackingStartTime = CFAbsoluteTimeGetCurrent()
+    
+    /// Frame count for performance tracking
+    private var frameCount: UInt = 0
+    
+    /// Event count for performance tracking
+    private var significantEventCount: UInt = 0
+    
+    /// Error count for performance tracking
+    private var errorCount: UInt = 0
+    
+    /// Recent processing times for performance tracking
+    private var recentProcessingTimes = [Double]()
     
     /// Maximum number of recent times to track
     private let maxRecentTimes = 30
     
-    /// Significant events detected
-    private var significantEventCount: Int = 0
+    /// Total processing time for performance tracking
+    private var totalProcessingTime: Double = 0
     
-    /// Errors encountered
-    private var errorCount: Int = 0
+    /// Recent audio data for visualization
+    private var recentAudioData: AudioData?
     
-    /// Tracking start time
-    private var trackingStartTime: CFAbsoluteTime = CFAbsoluteTimeGetCurrent()
-    
-    // MARK: - Public Properties
+    /// Recent visualization data
+    private var recentVisualizationData = [Float](repeating: 0, count: 128)
     
     /// Publisher for visualization data
     public var visualizationPublisher: AnyPublisher<VisualizationData, Never> {
-        return visualizatio    
+        return visualizationSubject.eraseToAnyPublisher()
+    }
     // MARK: - Initialization
     
     /// Initializes the bridge with an ML processor
@@ -133,6 +235,7 @@ public final class AudioBridge: @unchecked Sendable {
         self.formatConverter = FormatConverter()
         self.initializeFFT()
         self.setupMLSubscription()
+        self.performanceTracker.reset()
     }
     
     /// Initialize FFT components
@@ -144,17 +247,19 @@ public final class AudioBridge: @unchecked Sendable {
             vDSP_DFT_Direction.FORWARD
         )
         
-        // Create window buffer
+        // Create Hann window for better frequency resolution
         windowBuffer = [Float](repeating: 0, count: fftSize)
-        var window = windowBuffer
-        vDSP_hann_window(&window, vDSP_Length(fftSize), Int32(vDSP_HANN_NORM))
-        windowBuffer = window
+        vDSP_hann_window(windowBuffer!, vDSP_Length(fftSize), Int32(vDSP_HANN_NORM))
+    }
+    
+    /// Setup subscription to ML processor
+    private func setupMLSubscription() {
+        // Implementation would go here
     }
     
     deinit {
         // Clean up subscriptions
         audioDataSubscription?.cancel()
-        mlVisualizationSubscription?.cancel()
         
         // Clean up FFT resources
         if let fftSetup = fftSetup {
@@ -166,20 +271,20 @@ public final class AudioBridge: @unchecked Sendable {
     }
     
     // MARK: - Private Methods
-    
     /// Updates the connection state and notifies listeners
     private func updateConnectionState(_ newState: ConnectionState) {
         lock.lock()
         connectionState = newState
         lock.unlock()
-                    // Update metrics
-                    updatePerformanceMetrics()
-                } catch {
-                    handleProcessingError(error)
+        
+        Task {
+            do {
+                if newState == .active {
+                    // Process code when connection becomes active
                 }
+            } catch {
+                handleProcessingError(error)
             }
-        } catch {
-            handleProcessingError(error)
         }
     }
     
@@ -194,22 +299,23 @@ public final class AudioBridge: @unchecked Sendable {
             recentProcessingTimes.removeFirst()
         }
         recentProcessingTimes.append(time)
-    }
-    
-    /// Handles errors that occur during processing
-    private func handleProcessingError(_ error: Error) {
-        // Update performance tracking
-        performanceTracker.recordError()
-        errorCount += 1
         
-        // Log detailed error if it's a bridge error
+        // Also record in performance tracker
+        performanceTracker.recordProcessingTime(time)
+    }
+    /// Handles a processing error
+    private func handleProcessingError(_ error: Error) {
+        // Update error counter
+        errorCount += 1
+        performanceTracker.recordError()
+        // Log detailed error
         if let bridgeError = error as? AudioBridgeError {
             logger.error("Bridge error: \(bridgeError.description)")
         } else {
             logger.error("Processing error: \(error.localizedDescription)")
         }
         
-        // Notify of error
+        // Notify listeners of the error
         NotificationCenter.default.post(
             name: .audioBridgeError,
             object: self,
@@ -230,35 +336,54 @@ public final class AudioBridge: @unchecked Sendable {
         )
     }
     
+    /// Process audio data from the provider
+    private func processAudioData(_ audioData: AudioData) {
+        let processingStart = CFAbsoluteTimeGetCurrent()
+        
+        do {
+            // Store recent audio data
+            recentAudioData = audioData
+            
+            // Prepare data for ML processing if needed
+            let processableData = try formatConverter.convertForProcessing(audioData)
+            
+            // Process with ML
+            Task {
+                do {
+                    try await mlProcessor.processAudioData(processableData)
+                    
+                    // Create visualization data
+                    let isSignificantEvent = false
+                    if isSignificantEvent {
+                        performanceTracker.recordSignificantEvent()
+                    }
+                    
+                    let visualizationData = VisualizationData(
+                        values: audioData.frequencyData,
+                        isSignificantEvent: isSignificantEvent
+                    )
+                    // Record processing time
+                    let processingTime = CFAbsoluteTimeGetCurrent() - processingStart
+                    recordProcessingTime(processingTime)
+                    
+                    // Periodically update metrics
+                    if frameCount % 30 == 0 {
+                        updatePerformanceMetrics()
+                    }
+                } catch {
+                    handleProcessingError(error)
+                }
+            }
+        } catch {
+            handleProcessingError(error)
+        }
+    }
+    
     /// Gets the current performance metrics
     private func getCurrentMetrics() -> PerformanceMetrics {
-        let currentTime = CFAbsoluteTimeGetCurrent()
-        let elapsedMinutes = (currentTime - trackingStartTime) / 60.0
-        
-        var metrics = PerformanceMetrics()
-        
-        // Calculate frames per second
-        if elapsedMinutes > 0 {
-            metrics.framesPerSecond = Double(frameCount) / (elapsedMinutes * 60.0)
-            metrics.eventsPerMinute = Double(significantEventCount) / elapsedMinutes
-            metrics.errorRate = Double(errorCount) / elapsedMinutes
-        }
-        
-        // Calculate average processing time
-        if !recentProcessingTimes.isEmpty {
-            let recentTotal = recentProcessingTimes.reduce(0, +)
-            metrics.averageProcessingTime = (recentTotal / Double(recentProcessingTimes.count)) * 1000 // Convert to ms
-        } else if frameCount > 0 {
-            metrics.averageProcessingTime = (totalProcessingTime / Double(frameCount)) * 1000 // Convert to ms
-        }
-        
-        // Calculate conversion efficiency
-        metrics.conversionEfficiency = max(0, min(1, 1.0 - (metrics.averageProcessingTime / 16.0))) // Target is sub-16ms
-        
-        return metrics
+        // Get metrics from performance tracker
+        return performanceTracker.getCurrentMetrics()
     }
-// MARK: - Public Methods
-
 extension AudioBridge {
     /// Connects to an audio data provider
     /// - Parameter provider: The audio data provider
@@ -324,6 +449,13 @@ extension AudioBridge {
         // Reset performance tracker
         performanceTracker.reset()
         
+        // Reset internal tracking as well
+        frameCount = 0
+        totalProcessingTime = 0
+        recentProcessingTimes = []
+        significantEventCount = 0
+        errorCount = 0
+        trackingStartTime = CFAbsoluteTimeGetCurrent()
         // Notify of activation
         NotificationCenter.default.post(
             name: .audioBridgeStateChanged,
@@ -400,69 +532,6 @@ extension AudioBridge {
 }
 
 // MARK: - Supporting Types
-
-extension AudioBridge {
-    /// Connection state of the bridge
-    public enum ConnectionState: String {
-        /// Bridge is disconnected from audio provider
-        case disconnected
-        
-        /// Bridge is in the process of connecting
-        case connecting
-        
-        /// Bridge is connected but inactive (not processing)
-        case connected
-        
-        /// Bridge is inactive (connected but paused)
-        case inactive
-        
-        /// Bridge is active and processing audio
-        case active
-    }
-    
-    /// Error types that can occur in the bridge
-    public enum AudioBridgeError: Error, CustomStringConvertible {
-        /// Failed to connect to audio provider
-        case connectionFailed
-        
-        /// Failed to convert audio data
-        case dataConversionFailed
-        
-        /// Failed to process audio data
-        case processingFailed
-        
-        /// Description of the error
-        public var description: String {
-            switch self {
-            case .connectionFailed:
-                return "Failed to connect to audio provider"
-            case .dataConversionFailed:
-                return "Failed to convert audio data"
-            case .processingFailed:
-                return "Failed to process audio data"
-            }
-        }
-    }
-    
-    /// Performance metrics for monitoring
-    public struct PerformanceMetrics {
-        /// Frames processed per second
-        public var framesPerSecond: Double = 0
-        
-        /// Average processing time per frame (ms)
-        public var averageProcessingTime: Double = 0
-        
-        /// Events detected per minute
-        public var eventsPerMinute: Double = 0
-        
-        /// Errors per minute
-        public var errorRate: Double = 0
-        
-        /// Efficiency of audio conversion (0-1)
-        /// Efficiency of audio conversion (0-1)
-        public var conversionEfficiency: Double = 1.0
-    }
-}
 
 /// Performance tracking for audio processing
 class PerformanceTracker {
@@ -813,74 +882,8 @@ extension Notification.Name {
 
 // MARK: - Protocol Extensions
 
-/// Protocol for objects that provide audio data
-public protocol AudioDataProvider: AnyObject {
-    /// Publisher for audio data updates
-    var audioDataPublisher: AnyPublisher<AudioData, Never> { get }
-}
-
-/// Protocol for objects that can process audio data
-public protocol MLProcessorProtocol: AnyObject {
-    /// Whether the processor is ready for processing
-    var isReady: Bool { get }
-    
-    /// Publisher for visualization data
-    var visualizationDataPublisher: AnyPublisher<VisualizationData, Never> { get }
-    
-    /// Processes audio data
-    /// - Parameter audioData: The audio data to process
-    /// - Throws: Error if processing fails
-    func processAudioData(_ audioData: [Float]) async throws
-}
-
-/// Visualization data structure
-public struct VisualizationData {
-    /// Values to visualize (typically frequency spectrum)
-    public let values: [Float]
-    
-    /// Whether this data represents a significant event
-    public let isSignificantEvent: Bool
-    
-    /// Timestamp of the data
-    public let timestamp: Date
-    
-    /// Initializes a new visualization data instance
-    /// - Parameters:
-    ///   - values: Values to visualize
-    ///   - isSignificantEvent: Whether this is a significant event
-    ///   - timestamp: Timestamp of the data
-    public init(values: [Float], isSignificantEvent: Bool = false, timestamp: Date = Date()) {
-        self.values = values
-        self.isSignificantEvent = isSignificantEvent
-        self.timestamp = timestamp
-    }
-}
-
-/// Audio data structure
-public struct AudioData {
-    /// Frequency spectrum data
-    public let frequencyData: [Float]
-    
-    /// Audio level data (left and right channels)
-    public let levels: (left: Float, right: Float)
-    
-    /// Timestamp of the data
-    public let timestamp: Date
-    
-    /// Initializes a new audio data instance
-    /// - Parameters:
-    ///   - frequencyData: Frequency spectrum data
-    ///   - levels: Audio level data
-    ///   - timestamp: Timestamp of the data
-    public init(frequencyData: [Float], levels: (left: Float, right: Float), timestamp: Date = Date()) {
-        self.frequencyData = frequencyData
-        self.levels = levels
-        self.timestamp = timestamp
-    }
-}
-
 /// Protocol for audio data publishers
-public protocol AudioDataPublisher {
+public protocol AudioDataPublisher: AnyObject, Sendable {
     /// Publisher for audio data
     var publisher: AnyPublisher<AudioData, Never> { get }
     
@@ -905,10 +908,7 @@ public struct AudioBridgeSettings {
     public var bufferSize: Int = 1024
     
     /// Optimization level for audio processing
-    public enum OptimizationLevel {
-        /// Prioritize efficiency (lower power usage)
-        case efficiency
-        
+    public enum OptimizationLevel: Sendable {
         /// Balance efficiency and quality
         case balanced
         
