@@ -10,7 +10,7 @@ let package = Package(
         .macOS(.v15) // Specific requirement for macOS 15+
     ],
     products: [
-        // Main application
+        // Main executable application
         .executable(
             name: "AudioBloomAI",
             targets: ["AudioBloomApp"]
@@ -194,5 +194,5 @@ let package = Package(
             path: "Tests/AudioBloomUITests"
         )
     ],
-    swiftLanguageModes: [.default]
+    swiftLanguageVersions: [.v6]
 )
