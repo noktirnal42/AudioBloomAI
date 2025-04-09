@@ -5,7 +5,7 @@ import Metal
 import MetalKit
 import QuartzCore
 import os.log
-import CoreVideo
+import AppKit
 import Darwin
 
 /// Warning levels for performance issues
@@ -82,9 +82,11 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     
     // MARK: - Private Properties
     
-    /// CVDisplayLink for display synchronization
-    private var displayLink: CVDisplayLink?
+    /// Display link for frame synchronization
+    private var displayLink: Any?
     
+    /// Display link target for callback handling
+    private var displayLinkTarget: DisplayLinkTarget?
     /// Timer for automatic optimization
     private var optimizationTimer: Timer?
     
@@ -155,41 +157,35 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
         stopMonitoring()
     }
     
+    // MARK: - Display Link Target
+    
+    /// Class to handle DisplayLink callbacks
+    private final class DisplayLinkTarget {
+        weak var monitor: PerformanceMonitor?
+        
+        init(monitor: PerformanceMonitor) {
+            self.monitor = monitor
+        }
+        
+        @objc func displayLinkDidFire(displayLink: NSObject) {
+            guard let monitor = monitor else { return }
+            monitor.handleDisplayLinkFire()
+        }
+    }
+    
     // MARK: - Monitoring Control
     
     /// Starts performance monitoring
     public func startMonitoring() {
-        // Create a display link capable of being used with all active displays
-        var newDisplayLink: CVDisplayLink?
+        // Create display link target
+        let target = DisplayLinkTarget(monitor: self)
+        self.displayLinkTarget = target
         
-        // Set up display link callback
-        let displayLinkOutputCallback: CVDisplayLinkOutputCallback = { 
-            (displayLink: CVDisplayLink, 
-             inNow: UnsafePointer<CVTimeStamp>, 
-             inOutputTime: UnsafePointer<CVTimeStamp>, 
-             flagsIn: CVOptionFlags, 
-             flagsOut: UnsafeMutablePointer<CVOptionFlags>, 
-             displayLinkContext: UnsafeMutableRawPointer?) -> CVReturn in
-            
-            // Get the object reference from context
-            let monitor = Unmanaged<PerformanceMonitor>.fromOpaque(displayLinkContext!).takeUnretainedValue()
-            
-            // Execute frame update logic
-            monitor.displayLinkDidFire(displayLink: displayLink, outputTime: inOutputTime.pointee)
-            
-            return kCVReturnSuccess
-        }
-        
-        // Create display link
-        let error = CVDisplayLinkCreateWithActiveCGDisplays(&newDisplayLink)
-        
-        if error == kCVReturnSuccess, let newDisplayLink = newDisplayLink {
-            // Set the context to point to self
-            let pointerToSelf = Unmanaged.passUnretained(self).toOpaque()
-            CVDisplayLinkSetOutputCallback(newDisplayLink, displayLinkOutputCallback, pointerToSelf)
-            
-            // Start the display link
-            CVDisplayLinkStart(newDisplayLink)
+        if let mainView = NSApp.mainWindow?.contentView {
+            // Use modern NSView.displayLink API (available in macOS 15+)
+            let newDisplayLink = mainView.displayLink(target: target, 
+                                               selector: #selector(DisplayLinkTarget.displayLinkDidFire))
+            newDisplayLink.isPaused = false
             self.displayLink = newDisplayLink
             
             // Setup optimization timer if needed
@@ -201,36 +197,57 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
             
             // Reset initial time
             lastSampleTime = CFAbsoluteTimeGetCurrent()
+            
+            os_log(.debug, "Started performance monitoring with modern DisplayLink")
+        } else {
+            // Fallback to a timer if no view is available
+            let timer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+                self?.handleDisplayLinkFire()
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.displayLink = timer
+            
+            os_log(.debug, "Started performance monitoring with timer fallback")
         }
     }
-    
     /// Stops performance monitoring
     public func stopMonitoring() {
-        // Stop the display link
-        if let displayLink = displayLink {
-            CVDisplayLinkStop(displayLink)
-            self.displayLink = nil
+        // Stop the display link based on its type
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.invalidate()
+        } else if let displayLink = displayLink as? Timer {
+            displayLink.invalidate()
         }
+        
+        self.displayLink = nil
+        self.displayLinkTarget = nil
         
         // Invalidate optimization timer
         optimizationTimer?.invalidate()
         optimizationTimer = nil
+        
+        os_log(.debug, "Stopped performance monitoring")
     }
     
     /// Pauses performance monitoring
     public func pauseMonitoring() {
-        if let displayLink = displayLink, CVDisplayLinkIsRunning(displayLink) {
-            CVDisplayLinkStop(displayLink)
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.isPaused = true
+        } else if let displayLink = displayLink as? Timer {
+            displayLink.invalidate()
+            self.displayLink = nil
         }
         
         optimizationTimer?.invalidate()
         optimizationTimer = nil
+        
+        os_log(.debug, "Paused performance monitoring")
     }
     
     /// Resumes performance monitoring
     public func resumeMonitoring() {
-        if let displayLink = displayLink, !CVDisplayLinkIsRunning(displayLink) {
-            CVDisplayLinkStart(displayLink)
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.isPaused = false
         } else if displayLink == nil {
             startMonitoring()
         }
@@ -240,8 +257,9 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
                 self?.performOptimization()
             }
         }
+        
+        os_log(.debug, "Resumed performance monitoring")
     }
-    // MARK: - Public Methods
     
     /// Dictionary to track render timings
     private var renderTimings: [String: CFTimeInterval] = [:]
@@ -461,10 +479,7 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
                 self.totalLatency = 0
             }
         }
-            }
-        }
     }
-    
     // MARK: - Private Methods
     
     /// Setup GPU performance counters
@@ -494,9 +509,8 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
         
         return 0
     }
-    
-    /// Process display link frame update
-    private func displayLinkDidFire(displayLink: CVDisplayLink, outputTime: CVTimeStamp) {
+    /// Modern display link handler
+    private func handleDisplayLinkFire() {
         // Calculate frame time
         let currentTime = CFAbsoluteTimeGetCurrent()
         let frameTime = currentTime - lastSampleTime
