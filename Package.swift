@@ -11,33 +11,30 @@ let package = Package(
     products: [
         // Main application
         .executable(
-            name: "AudioBloomAI",
-            targets: ["AudioBloomApp"]
-        ),
-        // Libraries that can be reused
-        .library(
-            name: "AudioBloomCore",
-            targets: ["AudioBloomCore"]
-        ),
-        .library(
-            name: "AudioProcessor",
+                        swiftSettings: [
+                .define("ENABLE_NEURAL_ENGINE")
+            ],
+            linkerSettings: [
+                .linkedFramework("CoreML", .when(platforms: [.macOS])),
+                .linkedFramework("Accelerate", .when(platforms: [.macOS]))
+            ]
+r", 
             targets: ["AudioProcessor"]
         ),
         .library(
-            name: "MLEngine",
-            targets: ["MLEngine"]
-        ),
-        .library(
-            name: "Visualizer",
+            name: "Visualizer", 
             targets: ["Visualizer"]
         ),
         .library(
-            name: "AudioBloomUI",
+            name: "MLEngine", 
+            targets: ["MLEngine"]
+        ),
+        .library(
+            name: "AudioBloomUI", 
             targets: ["AudioBloomUI"]
         )
     ],
     dependencies: [
-        // External dependencies
         .package(url: "https://github.com/apple/swift-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),

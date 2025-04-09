@@ -4,6 +4,70 @@ import MetalKit
 import QuartzCore
 import Combine
 
+/// Visualization mode for audio rendering
+public enum VisualizationMode: Float {
+    case spectrum = 0.0
+    case waveform = 1.0
+    case particles = 2.0
+    case neural = 3.0
+}
+
+/// Theme for audio visualization
+public enum Theme: Float {
+    case classic = 0.0
+    case neon = 1.0
+    case monochrome = 2.0
+    case cosmic = 3.0
+    case sunset = 4.0
+    case ocean = 5.0
+    case forest = 6.0
+    case custom = 7.0
+}
+
+/// Uniform structure passed to Metal shaders
+struct AudioUniforms {
+    // Audio data array (raw FFT or waveform data)
+    var audioData: [Float] = [Float](repeating: 0, count: 1024)
+    
+    // Audio Analysis Parameters
+    var bassLevel: Float = 0.0
+    var midLevel: Float = 0.0
+    var trebleLevel: Float = 0.0
+    var leftLevel: Float = 0.0
+    var rightLevel: Float = 0.0
+    
+    // Theme colors
+    var primaryColor: SIMD4<Float> = SIMD4<Float>(1.0, 0.3, 0.7, 1.0)
+    var secondaryColor: SIMD4<Float> = SIMD4<Float>(0.2, 0.8, 1.0, 1.0)
+    var backgroundColor: SIMD4<Float> = SIMD4<Float>(0.05, 0.05, 0.1, 1.0)
+    var accentColor: SIMD4<Float> = SIMD4<Float>(1.0, 0.8, 0.2, 1.0)
+    
+    // Animation parameters
+    var time: Float = 0.0
+    var sensitivity: Float = 0.8
+    var motionIntensity: Float = 0.7
+    var themeIndex: Float = 0.0
+    
+    // Visualization settings
+    var visualizationMode: Float = 0.0
+    var previousMode: Float = 0.0
+    var transitionProgress: Float = 0.0
+    var colorIntensity: Float = 0.8
+    
+    // Additional parameters
+    var spectrumSmoothing: Float = 0.3
+    var particleCount: Float = 50.0
+    
+    // Neural visualization parameters
+    var neuralEnergy: Float = 0.5
+    var neuralPleasantness: Float = 0.5
+    var neuralComplexity: Float = 0.5
+    var beatDetected: Float = 0.0
+    
+    // Padding to ensure alignment (if needed)
+    private var _padding: [Float] = [Float](repeating: 0, count: 8)
+}
+
 /// Renderer that uses Metal to visualize audio data
 public class MetalRenderer {
     // MARK: - Constants
@@ -118,9 +182,143 @@ public class MetalRenderer {
         resetAudioData()
     }
     
-    /// Set up the Metal device and command queue
+    /// Set audio levels for visualization (truncated and duplicated - removed)
+    ///   - left: Left channel volume (0.0-1.0)
+    ///   - right: Right channel volume (0.0-1.0)
+    public func setAudioLevels(bass: Float, mid: Float, treble: Float, left: Float, right: Float) {
+        bassLevel = bass
+        midLevel = mid
+        trebleLevel = treble
+        leftLevel = left
+        rightLevel = right
+    }
+    
+    /// Set visualization parameters
+    /// - Parameters:
+    ///   - sensitivity: Audio sensitivity multiplier (0.0-1.0)
+    ///   - motionIntensity: Motion intensity multiplier (0.0-1.0)
+    ///   - colorIntensity: Color intensity parameter (0.0-1.0)
+    public func setVisualizationParameters(sensitivity: Float, motionIntensity: Float, colorIntensity: Float) {
+        self.sensitivity = sensitivity
+        self.motionIntensity = motionIntensity
+        self.colorIntensity = colorIntensity
+    }
+    
+    /// Set the visualization mode
+    /// - Parameter mode: The visualization mode (0: Spectrum, 1: Waveform, 2: Particles, 3: Neural)
+    public func setVisualizationMode(_ mode: VisualizationMode) {
+        if currentVisualizationMode != mode.rawValue {
+            previousVisualizationMode = currentVisualizationMode
+            currentVisualizationMode = mode.rawValue
+            
+            // Start transition
+            isInTransition = true
+            transitionStartTime = CACurrentMediaTime()
+            transitionProgress = 0.0
+        }
+    }
+    
+    /// Set the theme for visualization
+    /// - Parameter theme: The theme index (0-7)
+    public func setTheme(_ theme: Theme) {
+        themeIndex = theme.rawValue
+        
+        // Update colors based on the theme
+        switch theme {
+        case .classic:
+            primaryColor = Constants.defaultPrimaryColor
+            secondaryColor = Constants.defaultSecondaryColor
+            backgroundColor = Constants.defaultBackgroundColor
+            accentColor = Constants.defaultAccentColor
+            
+        case .neon:
+            primaryColor = SIMD4<Float>(0.0, 1.0, 0.7, 1.0)
+            secondaryColor = SIMD4<Float>(1.0, 0.0, 0.5, 1.0)
+            backgroundColor = SIMD4<Float>(0.05, 0.0, 0.1, 1.0)
+            accentColor = SIMD4<Float>(1.0, 1.0, 0.0, 1.0)
+            
+        case .monochrome:
+            primaryColor = SIMD4<Float>(1.0, 1.0, 1.0, 1.0)
+            secondaryColor = SIMD4<Float>(0.8, 0.8, 0.8, 1.0)
+            backgroundColor = SIMD4<Float>(0.0, 0.0, 0.0, 1.0)
+            accentColor = SIMD4<Float>(0.4, 0.4, 0.4, 1.0)
+            
+        case .cosmic:
+            primaryColor = SIMD4<Float>(0.5, 0.0, 1.0, 1.0)
+            secondaryColor = SIMD4<Float>(0.0, 0.5, 1.0, 1.0)
+            backgroundColor = SIMD4<Float>(0.0, 0.0, 0.15, 1.0)
+            accentColor = SIMD4<Float>(1.0, 0.5, 0.0, 1.0)
+            
+        case .sunset:
+            primaryColor = SIMD4<Float>(1.0, 0.4, 0.0, 1.0)
+            secondaryColor = SIMD4<Float>(0.8, 0.0, 0.3, 1.0)
+            backgroundColor = SIMD4<Float>(0.15, 0.05, 0.1, 1.0)
+            accentColor = SIMD4<Float>(1.0, 0.8, 0.0, 1.0)
+            
+        case .ocean:
+            primaryColor = SIMD4<Float>(0.0, 0.6, 0.9, 1.0)
+            secondaryColor = SIMD4<Float>(0.0, 0.3, 0.6, 1.0)
+            backgroundColor = SIMD4<Float>(0.0, 0.1, 0.2, 1.0)
+            accentColor = SIMD4<Float>(0.0, 1.0, 0.8, 1.0)
+            
+        case .forest:
+            primaryColor = SIMD4<Float>(0.0, 0.8, 0.4, 1.0)
+            secondaryColor = SIMD4<Float>(0.4, 0.6, 0.0, 1.0)
+            backgroundColor = SIMD4<Float>(0.05, 0.1, 0.05, 1.0)
+            accentColor = SIMD4<Float>(1.0, 0.9, 0.0, 1.0)
+            
+        case .custom:
+            // Custom theme preserves the current colors
+            break
+        }
+    }
+    
+    /// Set custom colors for visualization
+    /// - Parameters:
+    ///   - primary: Primary theme color
+    ///   - secondary: Secondary theme color
+    ///   - background: Background color
+    ///   - accent: Accent color for highlights
+    public func setCustomColors(primary: SIMD4<Float>, secondary: SIMD4<Float>, 
+                              background: SIMD4<Float>, accent: SIMD4<Float>) {
+        primaryColor = primary
+        secondaryColor = secondary
+        backgroundColor = background
+        accentColor = accent
+        
+        // Switch to custom theme
+        themeIndex = Theme.custom.rawValue
+    }
+    
+    /// Set neural visualization parameters
+    /// - Parameters:
+    ///   - energy: Energy parameter for neural visualization (0.0-1.0)
+    ///   - pleasantness: Pleasantness parameter (0.0-1.0)
+    ///   - complexity: Complexity parameter (0.0-1.0)
+    ///   - beatDetected: Beat detection flag (0.0 or 1.0)
+    public func setNeuralParameters(energy: Float, pleasantness: Float, complexity: Float, beatDetected: Float) {
+        neuralEnergy = energy
+        neuralPleasantness = pleasantness
+        neuralComplexity = complexity
+        self.beatDetected = beatDetected
+    }
+    
+    /// Reset the audio data to zeros
+    private func resetAudioData() {
+        for i in 0..<Constants.maxAudioFrames {
+            audioData[i] = 0.0
+        }
+        
+        bassLevel = 0.0
+        midLevel = 0.0
+        trebleLevel = 0.0
+        leftLevel = 0.0
+        rightLevel = 0.0
+    }
+    
+    /// Set up Metal device and command queue
     private func setupMetal() throws {
-        // Get the default Metal device
+        // Get the default device
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw RendererError.deviceNotAvailable
         }
