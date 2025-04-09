@@ -3,6 +3,9 @@ import AVFoundation
 import Combine
 import AudioBloomCore
 import Accelerate
+#if os(macOS)
+import CoreAudio
+#endif
 
 /// Audio Engine for capturing and processing audio data
 public class AudioEngine: ObservableObject, AudioDataProvider {
@@ -12,26 +15,113 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     /// Published frequency data from FFT analysis
     @Published public private(set) var frequencyData: [Float] = []
     
+    /// Available audio input devices
+    @Published public private(set) var availableInputDevices: [AudioDevice] = []
+    
+    /// Available audio output devices
+    @Published public private(set) var availableOutputDevices: [AudioDevice] = []
+    
+    /// Currently selected audio input device
+    @Published public private(set) var selectedInputDevice: AudioDevice?
+    
+    /// Currently selected audio output device
+    @Published public private(set) var selectedOutputDevice: AudioDevice?
+    
+    /// Currently active audio source
+    @Published public private(set) var activeAudioSource: AudioSourceType = .microphone
+    
     /// Audio data publisher for subscribers
     private let audioDataPublisher = AudioDataPublisher()
     
     /// The AVAudioEngine instance for audio processing
     private let avAudioEngine = AVAudioEngine()
     
-    /// FFT helper for frequency analysis
-    private var fftHelper: FFTHelper?
+    /// The AVAudioEngine instance for system audio (if available)
+    private let systemAudioEngine = AVAudioEngine()
+    
+    /// Flag indicating if the engine is running
+    private var isRunning = false
+    
+    /// Types of audio sources
+    public enum AudioSourceType: String, CaseIterable, Identifiable {
+        case microphone = "Microphone"
+        case systemAudio = "System Audio"
+        case mixed = "Mixed (Mic + System)"
+        
+        public var id: String { self.rawValue }
+    }
+    
+    /// Audio device configuration
+    public struct AudioConfiguration {
+        /// Whether to enable system audio capture
+        public var enableSystemAudioCapture: Bool = true
+        
+        /// Whether to use custom audio device selection
+        public var useCustomAudioDevice: Bool = false
+        
+        /// Volume level for microphone input (0.0-1.0)
+        public var microphoneVolume: Float = 1.0
+        
+        /// Volume level for system audio input (0.0-1.0)
+        public var systemAudioVolume: Float = 1.0
+        
+        /// Whether to mix inputs or use only selected source
+        public var mixInputs: Bool = false
+    }
+    
+    /// Audio device model
+    public struct AudioDevice: Identifiable, Hashable {
+        /// Unique identifier for the device
+        public let id: String
+        
+        /// Human-readable name of the device
+        public let name: String
+        
+        /// Device manufacturer
+        public let manufacturer: String
+        
+        /// Whether this is an input device
+        public let isInput: Bool
+        
+        /// Sample rate of the device
+        public let sampleRate: Double
+        
+        /// Number of audio channels
+        public let channelCount: Int
+        
+        public var description: String {
+            return "\(name) (\(manufacturer))"
+        }
+        
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+        }
+        
+        public static func == (lhs: AudioDevice, rhs: AudioDevice) -> Bool {
+            return lhs.id == rhs.id
+        }
+    }
     
     /// Audio tap node for extracting audio data
     private var audioTap: AVAudioNode?
+    
+    /// Current audio configuration
+    private var audioConfig = AudioConfiguration()
+    
+    /// System audio capture node (implementation depends on platform)
+    private var systemAudioNode: AVAudioNode?
+    
+    /// Audio mixer for routing between sources
+    private var mainMixer: AVAudioMixerNode?
+    
+    /// Audio device observer
+    private var deviceObserver: Any?
     
     /// Processing queue for audio analysis
     private let processingQueue = DispatchQueue(label: "com.audiobloom.audioprocessing", qos: .userInteractive)
     
     /// Timer for polling audio data
     private var audioPollingTimer: Timer?
-    
-    /// Indicates if the audio engine is currently running
-    private var isRunning = false
     
     /// Initializes a new AudioEngine
     public init() {
@@ -40,22 +130,310 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
         
         // Setup notification observers for audio engine interruptions
         NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleAudioEngineInterruption),
-            name: NSNotification.Name.AVAudioEngineConfigurationChange,
-            object: avAudioEngine
-        )
+                            let name = deviceName as String
+                            
+                            // Check if it's an output device
+                            var outputScopeProperty = AudioObjectPropertyAddress(
+                                mSelector: kAudioDevicePropertyStreamConfiguration,
+                                mScope: kAudioDevicePropertyScopeOutput,
+                                mElement: kAudioObjectPropertyElementMaster
+                            )
+                            
+                            var outputPropertySize: UInt32 = 0
+                            result = AudioObjectGetPropertyDataSize(deviceID, &outputScopeProperty, 0, nil, &outputPropertySize)
+                            
+                            if result == 0 && outputPropertySize > 0 {
+                                // This is an output device
+                                let device = AudioDevice(
+                                    id: String(deviceID),
+                                    name: name,
+                                    manufacturer: "Unknown",
+                                    isInput: false,
+                                    sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+                                    channelCount: 2
+                                )
+                                outputDevices.append(device)
+                            }
+                            
+                            // Check if it's an input device
+                            var inputScopeProperty = AudioObjectPropertyAddress(
+                                mSelector: kAudioDevicePropertyStreamConfiguration,
+                                mScope: kAudioDevicePropertyScopeInput,
+                                mElement: kAudioObjectPropertyElementMaster
+                            )
+                            
+                            var inputPropertySize: UInt32 = 0
+                            result = AudioObjectGetPropertyDataSize(deviceID, &inputScopeProperty, 0, nil, &inputPropertySize)
+                            
+                            if result == 0 && inputPropertySize > 0 {
+                                // This is an input device
+                                let device = AudioDevice(
+                                    id: String(deviceID),
+                                    name: name,
+                                    manufacturer: "Unknown",
+                                    isInput: true,
+                                    sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+                                    channelCount: 2
+                                )
+                                inputDevices.append(device)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        #else
+        // For iOS, the device selection is much simpler
+        let inputDevices = [AudioDevice(
+            id: "default",
+            name: "Default Input",
+            manufacturer: "Apple",
+            isInput: true,
+            sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+            channelCount: 2
+        )]
+        
+        let outputDevices = [AudioDevice(
+            id: "default",
+            name: "Default Output",
+            manufacturer: "Apple",
+            isInput: false,
+            sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+            channelCount: 2
+        )]
+        #endif
+        
+        // Update our published properties on the main thread
+        DispatchQueue.main.async {
+            self.availableInputDevices = inputDevices
+            self.availableOutputDevices = outputDevices
+            
+            // Set default devices if none selected
+            if self.selectedInputDevice == nil && !inputDevices.isEmpty {
+                self.selectedInputDevice = inputDevices.first
+            }
+            
+            if self.selectedOutputDevice == nil && !outputDevices.isEmpty {
+                self.selectedOutputDevice = outputDevices.first
+            }
+        }
     }
     
-    deinit {
-        NotificationCenter.default.removeObserver(self)
-        stopCapture()
+    // MARK: - Device Selection
+    
+    /// Sets the active audio device
+    /// - Parameters:
+    ///   - device: The audio device to activate
+    ///   - reconfigureAudio: Whether to reconfigure the audio engine immediately
+    public func setActiveDevice(_ device: AudioDevice, reconfigureAudio: Bool = true) {
+        if device.isInput {
+            // If we're changing input device
+            guard selectedInputDevice?.id != device.id else { return }
+            
+            // Stop audio engine if it's running
+            let wasRunning = isRunning
+            if wasRunning {
+                stopCapture()
+            }
+            
+            // Update selected device
+            selectedInputDevice = device
+            
+            // Reconfigure and restart if needed
+            if reconfigureAudio {
+                configureAudioEngine()
+                if wasRunning {
+                    try? startCapture()
+                }
+            }
+        } else {
+            // Output device handling
+            selectedOutputDevice = device
+            
+            #if os(macOS)
+            // Set output device on macOS
+            setAudioDevice(id: device.id, isInput: false)
+            #endif
+        }
     }
     
-    /// Sets up the audio session for macOS
-    public func setupAudioSession() async throws {
-        // Configure audio engine for macOS
+    /// Sets the active audio source type
+    /// - Parameter sourceType: The audio source type to activate
+    public func setAudioSource(_ sourceType: AudioSourceType) {
+        guard activeAudioSource != sourceType else { return }
+        
+        // Stop audio if it's running
+        let wasRunning = isRunning
+        if wasRunning {
+            stopCapture()
+        }
+        
+        // Update audio source
+        activeAudioSource = sourceType
+        
+        // Update audio configuration
+        switch sourceType {
+        case .microphone:
+            audioConfig.mixInputs = false
+            audioConfig.microphoneVolume = 1.0
+            audioConfig.systemAudioVolume = 0.0
+        case .systemAudio:
+            audioConfig.mixInputs = false
+            audioConfig.microphoneVolume = 0.0
+            audioConfig.systemAudioVolume = 1.0
+        case .mixed:
+            audioConfig.mixInputs = true
+            audioConfig.microphoneVolume = 0.7
+            audioConfig.systemAudioVolume = 0.7
+        }
+        
+        // Reconfigure audio engine
         configureAudioEngine()
+        
+        // Restart if needed
+        if wasRunning {
+            try? startCapture()
+        }
+    }
+    
+    /// Adjusts volume levels for audio sources
+    /// - Parameters:
+    ///   - micVolume: Microphone volume (0.0-1.0)
+    ///   - systemVolume: System audio volume (0.0-1.0)
+    public func adjustVolumes(micVolume: Float, systemVolume: Float) {
+        audioConfig.microphoneVolume = max(0, min(1, micVolume))
+        audioConfig.systemAudioVolume = max(0, min(1, systemVolume))
+        
+        // Update mixer volumes if we have an active mixer
+        if let mainMixer = mainMixer {
+            if audioConfig.mixInputs && systemAudioNode != nil {
+                // Update the gain on the input connections
+                // This is a simple approach; in a real-world implementation
+                // you would use a more sophisticated mixing approach
+                mainMixer.volume = audioConfig.microphoneVolume
+                systemAudioNode?.volume = audioConfig.systemAudioVolume
+            }
+        }
+    }
+    
+    #if os(macOS)
+    /// Sets the audio device for the system
+    /// - Parameters:
+    ///   - id: Device ID
+    ///   - isInput: Whether this is an input device
+    private func setAudioDevice(id: String, isInput: Bool) {
+        // On macOS, changing audio devices requires working with Core Audio
+        // This is a simplified implementation
+        
+        guard let deviceID = AudioDeviceID(id) else { return }
+        
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: isInput ? kAudioHardwarePropertyDefaultInputDevice : kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        
+        // Set the default device
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let result = AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            0,
+            nil,
+            size,
+            &deviceID
+        )
+        
+        if result != 0 {
+            print("Failed to set audio device: \(id), error: \(result)")
+        }
+    }
+    #endif
+    
+    // MARK: - System Audio Capture
+    
+    /// Sets up system audio capture on macOS
+    private func setupSystemAudioCapture() throws {
+        #if os(macOS)
+        // On macOS, capturing system audio requires special setup
+        // This is a simplified implementation. In a real-world app,
+        // you would need a more robust approach or a third-party solution
+        
+        // Create a mixer node for system audio
+        let systemMixer = AVAudioMixerNode()
+        systemAudioEngine.attach(systemMixer)
+        
+        // Set up a virtual input that can capture system audio
+        // Note: This is where you'd integrate with third-party solutions like BlackHole
+        // For simplicity, we'll simulate system audio using a tone generator
+        
+        let mainMixer = self.mainMixer ?? AVAudioMixerNode()
+        if self.mainMixer == nil {
+            avAudioEngine.attach(mainMixer)
+            self.mainMixer = mainMixer
+        }
+        
+        // For demonstration, create an oscillator to simulate system audio
+        let oscillator = AVAudioSourceNode { _, _, frameCount, audioBufferList -> OSStatus in
+            let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
+            
+            // Simple sine wave generation at 440Hz
+            for frame in 0..<Int(frameCount) {
+                let value = Float(sin(2.0 * .pi * 440.0 * Double(frame) / Double(AudioBloomCore.Constants.defaultSampleRate)))
+                
+                // Apply volume and scale
+                let scaledValue = value * 0.3 * self.audioConfig.systemAudioVolume
+                
+                // Fill all channels with the same value
+                for buffer in ablPointer {
+                    let bufferPointer = UnsafeMutableBufferPointer<Float>(
+                        start: buffer.mData?.assumingMemoryBound(to: Float.self),
+                        count: Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
+                    )
+                    bufferPointer[frame] = scaledValue
+                }
+            }
+            
+            return noErr
+        }
+        
+        avAudioEngine.attach(oscillator)
+        
+        // Set the system audio node
+        systemAudioNode = oscillator
+        
+        // Connect the oscillator to the main mixer if we're mixing inputs
+        if audioConfig.mixInputs {
+            let format = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: AudioBloomCore.Constants.defaultSampleRate,
+                channels: 2,
+                interleaved: false
+            )
+            
+            if let format = format {
+                avAudioEngine.connect(oscillator, to: mainMixer, format: format)
+            }
+        }
+        
+        // In a real implementation, you would set up system audio capture
+        // using a virtual audio device or Audio Device Aggregation
+        #endif
+    }
+    
+    /// Returns an audio data publisher for subscribers
+    public func getAudioDataPublisher() -> AudioDataPublisher {
+        return audioDataPublisher
+    }
+        // Check if system audio capture is available and set up if needed
+        if audioConfig.enableSystemAudioCapture {
+            do {
+                try setupSystemAudioCapture()
+            } catch {
+                print("Warning: System audio capture not available: \(error)")
+                // Continue without system audio as this is not a critical failure
+            }
+        }
     }
     
     /// Starts audio capture
@@ -86,18 +464,15 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
         avAudioEngine.stop()
         avAudioEngine.reset()
         
-        // Set up the input node - macOS typically has multiple audio devices
-        let inputNode = avAudioEngine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
+        // Create a main mixer node
+        let mainMixer = AVAudioMixerNode()
+        avAudioEngine.attach(mainMixer)
+        self.mainMixer = mainMixer
         
-        // Create a mixer node to tap into
-        let mixerNode = AVAudioMixerNode()
-        avAudioEngine.attach(mixerNode)
+        // Configure the input based on selected device
+        configureMicrophoneInput(mixerNode: mainMixer)
         
-        // Connect input to mixer
-        avAudioEngine.connect(inputNode, to: mixerNode, format: inputFormat)
-        
-        // Install tap on mixer node to receive audio buffers
+        // Install tap on the main mixer node to receive audio buffers
         let tapFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: AudioBloomCore.Constants.defaultSampleRate,
@@ -105,16 +480,33 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
             interleaved: false
         )
         
-        mixerNode.installTap(onBus: 0, bufferSize: UInt32(AudioBloomCore.Constants.defaultFFTSize), format: tapFormat) { [weak self] buffer, time in
+        mainMixer.installTap(onBus: 0, bufferSize: UInt32(AudioBloomCore.Constants.defaultFFTSize), format: tapFormat) { [weak self] buffer, time in
             self?.processingQueue.async {
                 self?.processAudioBuffer(buffer)
             }
         }
         
-        self.audioTap = mixerNode
+        self.audioTap = mainMixer
         
         // Prepare engine
         avAudioEngine.prepare()
+    }
+    
+    /// Configures the microphone input
+    private func configureMicrophoneInput(mixerNode: AVAudioMixerNode) {
+        let inputNode = avAudioEngine.inputNode
+        
+        // If we have a selected input device, try to use it
+        if let selectedDevice = selectedInputDevice, audioConfig.useCustomAudioDevice {
+            #if os(macOS)
+            // On macOS, we need to set the device ID before using the input node
+            setAudioDevice(id: selectedDevice.id, isInput: true)
+            #endif
+        }
+        
+        // Now connect the input to the mixer
+        let inputFormat = inputNode.outputFormat(forBus: 0)
+        avAudioEngine.connect(inputNode, to: mixerNode, format: inputFormat)
     }
     
     /// Processes audio buffer data
@@ -205,6 +597,9 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     @objc private func handleAudioEngineInterruption(_ notification: Notification) {
         // This is called when audio configuration changes (like unplugging a device)
         if !avAudioEngine.isRunning && isRunning {
+            // Refresh available audio devices
+            refreshAudioDevices()
+            
             // Try to reconfigure and restart
             do {
                 configureAudioEngine()
@@ -214,6 +609,118 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
             }
         }
     }
+    
+    // MARK: - Device Management
+    
+    /// Refreshes the list of available audio devices
+    public func refreshAudioDevices() {
+        #if os(macOS)
+        // Get all audio devices on macOS
+        var inputDevices: [AudioDevice] = []
+        var outputDevices: [AudioDevice] = []
+        
+        let session = AVAudioSession.sharedInstance()
+        
+        // Get available input devices
+        if let inputs = AVAudioSession.sharedInstance().availableInputs {
+            for input in inputs {
+                let device = AudioDevice(
+                    id: input.uid,
+                    name: input.portName,
+                    manufacturer: "Apple",
+                    isInput: true,
+                    sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+                    channelCount: 2
+                )
+                inputDevices.append(device)
+            }
+        }
+        
+        // For output devices, we need to use Core Audio APIs
+        var propertySize: UInt32 = 0
+        var result = AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject),
+            &AudioObjectPropertyAddress(
+                mSelector: kAudioHardwarePropertyDevices,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMaster
+            ),
+            0,
+            nil,
+            &propertySize
+        )
+        
+        if result == 0 {
+            let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
+            var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
+            
+            result = AudioObjectGetPropertyData(
+                AudioObjectID(kAudioObjectSystemObject),
+                &AudioObjectPropertyAddress(
+                    mSelector: kAudioHardwarePropertyDevices,
+                    mScope: kAudioObjectPropertyScopeGlobal,
+                    mElement: kAudioObjectPropertyElementMaster
+                ),
+                0,
+                nil,
+                &propertySize,
+                &deviceIDs
+            )
+            
+            if result == 0 {
+                // Process each device
+                for deviceID in deviceIDs {
+                    // Get device name
+                    var namePropertySize: UInt32 = 0
+                    var nameProperty = AudioObjectPropertyAddress(
+                        mSelector: kAudioObjectPropertyName,
+                        mScope: kAudioObjectPropertyScopeGlobal,
+                        mElement: kAudioObjectPropertyElementMaster
+                    )
+                    
+                    result = AudioObjectGetPropertyDataSize(deviceID, &nameProperty, 0, nil, &namePropertySize)
+                    if result == 0 {
+                        var deviceName: CFString = "" as CFString
+                        result = AudioObjectGetPropertyData(deviceID, &nameProperty, 0, nil, &namePropertySize, &deviceName)
+                        
+                        if result == 0 {
+                            let name = deviceName as String
+                            
+                            // Check if it's an output device
+                            var outputScopeProperty = AudioObjectPropertyAddress(
+                                mSelector: kAudioDevicePropertyStreamConfiguration,
+                                mScope: kAudioDevicePropertyScopeOutput,
+                                mElement: kAudioObjectPropertyElementMaster
+                            )
+                            
+                            var outputPropertySize: UInt32 = 0
+                            result = AudioObjectGetPropertyDataSize(deviceID, &outputScopeProperty, 0, nil, &outputPropertySize)
+                            
+                            if result == 0 && outputPropertySize > 0 {
+                                // This is an output device
+                                let device = AudioDevice(
+                                    id: String(deviceID),
+                                    name: name,
+                                    manufacturer: "Unknown",
+                                    isInput: false,
+                                    sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+                                    channelCount: 2
+                                )
+                                outputDevices.append(device)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        #else
+        // For iOS, the device selection is much simpler
+        let inputDevices = [AudioDevice(
+            id: "default",
+            name: "Default Input",
+            manufacturer: "Apple",
+            isInput: true,
+            sampleRate: Double(AudioBloomCore.Constants.default
 }
 
 /// Helper class for performing FFT (Fast Fourier Transform) on audio data
