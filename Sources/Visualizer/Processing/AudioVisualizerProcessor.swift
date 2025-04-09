@@ -3,9 +3,8 @@ import Combine
 import SwiftUI
 import Accelerate
 import AVFoundation
-import AudioProcessor
 import AudioBloomCore
-
+import AudioBloomCore.Audio
 /// Protocol for providing audio data to visualizers
 public protocol AudioDataProvider {
     /// Setup audio session for capture
