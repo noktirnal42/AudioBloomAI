@@ -10,12 +10,17 @@ import Logging
 
 /// Bridge connecting audio data providers to ML processors
 public final class AudioBridge: @unchecked Sendable {
-    // MARK: - Types
+    // MARK: - Public Properties
     
-    /// Connection state of the bridge
-    public enum ConnectionState: String {
-        case disconnected
-        case connecting
+    /// Publisher for visualization data
+    public var visualizationPublisher: AnyPublisher<VisualizationData, Never> {
+        return visualizationSubject.eraseToAnyPublisher()
+    }
+    
+    /// Performance tracker for metrics
+    private let performanceTracker: PerformanceTracker
+    
+    // MARK: - Initialization
         case connected
         case active
         case inactive
@@ -131,10 +136,10 @@ public final class AudioBridge: @unchecked Sendable {
     public init(mlProcessor: MLProcessorProtocol) {
         self.mlProcessor = mlProcessor
         self.formatConverter = FormatConverter()
+        self.performanceTracker = PerformanceTracker()
         self.initializeFFT()
         self.setupMLSubscription()
     }
-    
     /// Initialize FFT components
     private func initializeFFT() {
         // Create FFT setup
@@ -172,6 +177,55 @@ public final class AudioBridge: @unchecked Sendable {
         lock.lock()
         connectionState = newState
         lock.unlock()
+        
+        // Notify listeners
+        NotificationCenter.default.post(
+            name: .audioBridgeStateChanged,
+            object: self,
+            userInfo: ["state": newState]
+        )
+        
+        // Update metrics
+        updatePerformanceMetrics()
+    }
+    
+    /// Setup ML subscription for visualization data
+    private func setupMLSubscription() {
+        // Subscribe to ML visualization data
+        mlVisualizationSubscription = mlProcessor.visualizationDataPublisher
+            .receive(on: processingQueue)
+            .sink { [weak self] visualizationData in
+                self?.visualizationSubject.send(visualizationData)
+            }
+    }
+    
+    /// Process audio data from provider
+    /// - Parameter audioData: The audio data to process
+    private func processAudioData(_ audioData: AudioData) {
+        guard connectionState == .active else { return }
+        
+        // Record processing start time
+        let startTime = CFAbsoluteTimeGetCurrent()
+        performanceTracker.beginProcessing()
+        
+        do {
+            // Convert audio data to ML-processable format
+            let processableData = try formatConverter.convertForProcessing(audioData)
+            
+            // Process the data with ML processor
+            Task {
+                do {
+                    try await mlProcessor.processAudioData(processableData)
+                    
+                    // Record significant event for complex patterns
+                    if audioData.levels.left > 0.8 || audioData.levels.right > 0.8 {
+                        performanceTracker.recordSignificantEvent()
+                    }
+                    
+                    // Record processing time
+                    let processingTime = CFAbsoluteTimeGetCurrent() - startTime
+                    performanceTracker.recordProcessingTime(processingTime)
+                    
                     // Update metrics
                     updatePerformanceMetrics()
                 } catch {
@@ -182,7 +236,6 @@ public final class AudioBridge: @unchecked Sendable {
             handleProcessingError(error)
         }
     }
-    
     /// Records processing time for performance tracking
     private func recordProcessingTime(_ time: Double) {
         // Add to running totals
@@ -398,70 +451,15 @@ extension AudioBridge {
         return magnitude
     }
 }
-
 // MARK: - Supporting Types
 
-extension AudioBridge {
-    /// Connection state of the bridge
-    public enum ConnectionState: String {
-        /// Bridge is disconnected from audio provider
-        case disconnected
-        
-        /// Bridge is in the process of connecting
-        case connecting
-        
-        /// Bridge is connected but inactive (not processing)
-        case connected
-        
-        /// Bridge is inactive (connected but paused)
-        case inactive
-        
-        /// Bridge is active and processing audio
-        case active
-    }
-    
-    /// Error types that can occur in the bridge
-    public enum AudioBridgeError: Error, CustomStringConvertible {
-        /// Failed to connect to audio provider
-        case connectionFailed
-        
-        /// Failed to convert audio data
-        case dataConversionFailed
-        
-        /// Failed to process audio data
-        case processingFailed
-        
-        /// Description of the error
-        public var description: String {
-            switch self {
-            case .connectionFailed:
-                return "Failed to connect to audio provider"
-            case .dataConversionFailed:
-                return "Failed to convert audio data"
-            case .processingFailed:
-                return "Failed to process audio data"
-            }
-        }
-    }
-    
-    /// Performance metrics for monitoring
-    public struct PerformanceMetrics {
-        /// Frames processed per second
-        public var framesPerSecond: Double = 0
-        
-        /// Average processing time per frame (ms)
-        public var averageProcessingTime: Double = 0
-        
-        /// Events detected per minute
-        public var eventsPerMinute: Double = 0
-        
-        /// Errors per minute
-        public var errorRate: Double = 0
-        
-        /// Efficiency of audio conversion (0-1)
-        /// Efficiency of audio conversion (0-1)
-        public var conversionEfficiency: Double = 1.0
-    }
+// Note: The ConnectionState and AudioBridgeError types are already defined above.
+// The duplicate definitions are removed here to fix the structure.
+
+/// Performance metrics for monitoring
+extension AudioBridge.PerformanceMetrics {
+    // The core structure is defined at the top of the file
+    // This extension is for any additional functionality
 }
 
 /// Performance tracking for audio processing
