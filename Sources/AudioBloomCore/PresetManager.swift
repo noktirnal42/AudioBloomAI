@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 /// Represents a saved configuration preset for AudioBloom
 public struct Preset: Identifiable, Codable, Equatable {
@@ -136,7 +137,7 @@ public struct Preset: Identifiable, Codable, Equatable {
 /// Visualization settings for a preset
 public struct VisualizationSettings: Codable, Equatable {
     /// The visual theme
-    public var theme: VisualTheme
+    public var theme: AudioBloomCore.VisualTheme
     
     /// Audio visualization sensitivity (0.0-1.0)
     public var sensitivity: Double
@@ -152,7 +153,7 @@ public struct VisualizationSettings: Codable, Equatable {
     
     /// Initialize with default settings
     public init() {
-        theme = .classic
+        theme = AudioBloomCore.VisualTheme.classic
         sensitivity = 0.75
         motionIntensity = 0.8
         showFPS = false
@@ -160,7 +161,7 @@ public struct VisualizationSettings: Codable, Equatable {
     }
     
     /// Initialize with custom settings
-    public init(theme: VisualTheme,
+    public init(theme: AudioBloomCore.VisualTheme,
                 sensitivity: Double,
                 motionIntensity: Double,
                 showFPS: Bool,
@@ -337,7 +338,7 @@ public class PresetManager: ObservableObject {
                 name: "Classic Visualizer",
                 description: "Traditional audio visualization with microphone input",
                 visualSettings: VisualizationSettings(
-                    theme: .classic,
+                    theme: AudioBloomCore.VisualTheme.classic,
                     sensitivity: 0.75,
                     motionIntensity: 0.8,
                     showFPS: false,
@@ -362,7 +363,7 @@ public class PresetManager: ObservableObject {
                 name: "Neural System Audio",
                 description: "Neural-enhanced visualization of system audio",
                 visualSettings: VisualizationSettings(
-                    theme: .neon,
+                    theme: AudioBloomCore.VisualTheme.neon,
                     sensitivity: 0.8,
                     motionIntensity: 0.9,
                     showFPS: false,
@@ -387,7 +388,7 @@ public class PresetManager: ObservableObject {
                 name: "Cosmic Mix",
                 description: "Cosmic theme with mixed audio inputs and maximum neural enhancement",
                 visualSettings: VisualizationSettings(
-                    theme: .cosmic,
+                    theme: AudioBloomCore.VisualTheme.cosmic,
                     sensitivity: 0.85,
                     motionIntensity: 0.95,
                     showFPS: true,

@@ -39,11 +39,11 @@ let package = Package(
     ],
     dependencies: [
         // External dependencies
-        .package(url: "https://github.com/apple/swift-algorithms", from: "1.0.0"),
-        .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.5.0"),
-        .package(url: "https://github.com/AudioKit/AudioKit", from: "5.6.0")
+        .package(url: "https://github.com/apple/swift-algorithms", from: "1.2.1"),
+        .package(url: "https://github.com/apple/swift-numerics", from: "1.0.3"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.3"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.19.0"),
+        .package(url: "https://github.com/AudioKit/AudioKit", from: "5.6.5")
     ],
     targets: [
         // Main application target
@@ -100,7 +100,7 @@ let package = Package(
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "Numerics", package: "swift-numerics")
             ],
-            exclude: ["README.md", "MetalRenderer.swift"], // Exclude duplicate file
+            exclude: ["README.md"], // Removed MetalRenderer.swift from exclusions
             resources: [
                 .process("Resources/Shaders")
             ],
@@ -153,7 +153,7 @@ let package = Package(
                 "Visualizer",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
             ],
-            exclude: ["README.md", "PresetControlsView.swift"], // Exclude duplicate file
+            exclude: ["README.md"], // Removed PresetControlsView.swift from exclusions
             swiftSettings: [
                 // Any swift settings would go here
             ],
@@ -194,5 +194,5 @@ let package = Package(
             path: "Tests/AudioBloomUITests"
         )
     ],
-    swiftLanguageVersions: [.v6]
+    swiftLanguageModes: [.version("6")]
 )
