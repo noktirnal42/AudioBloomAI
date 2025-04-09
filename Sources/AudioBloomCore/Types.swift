@@ -11,11 +11,18 @@ import QuartzCore
 import MetalKit
 import SwiftUI
 import Accelerate
+// MARK: - AudioBridge Settings
 
-// MARK: - Audio Data Types
-
-/// Audio data structure representing an audio buffer and its properties
-public struct AudioData: Sendable {
+/// Settings for audio bridge configuration
+public struct AudioBridgeSettings: Sendable {
+    /// Whether to apply Neural Engine optimizations
+    public var useNeuralEngine: Bool = true
+    
+    /// Optimization level for processing
+    public var optimizationLevel: OptimizationLevel = .balanced
+    
+    /// Buffer size for audio processing
+    public var bufferSize: Int = 
     /// The audio samples
     public let samples: [Float]
     
