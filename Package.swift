@@ -79,6 +79,9 @@ let package = Package(
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "AudioKit", package: "AudioKit")
             ],
+            swiftSettings: [
+                // Any swift settings would go here
+            ],
             linkerSettings: [
                 .linkedFramework("AVFoundation", .when(platforms: [.macOS])),
                 .linkedFramework("CoreAudio", .when(platforms: [.macOS])),
@@ -99,6 +102,9 @@ let package = Package(
             ],
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
+            ],
+            swiftSettings: [
+                // Any swift settings would go here
             ],
             linkerSettings: [
                 .linkedFramework("Metal", .when(platforms: [.macOS])),
@@ -122,14 +128,14 @@ let package = Package(
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
             ],
+            swiftSettings: [
+                .define("ENABLE_NEURAL_ENGINE")
+            ],
             linkerSettings: [
                 .linkedFramework("CoreML", .when(platforms: [.macOS])),
                 .linkedFramework("Accelerate", .when(platforms: [.macOS])),
                 .linkedFramework("CreateML", .when(platforms: [.macOS])),
                 .linkedFramework("SoundAnalysis", .when(platforms: [.macOS]))
-            ],
-            swiftSettings: [
-                .define("ENABLE_NEURAL_ENGINE")
             ]
         ),
         
@@ -141,6 +147,9 @@ let package = Package(
                 "MLEngine",
                 "Visualizer",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
+            ],
+            swiftSettings: [
+                // Any swift settings would go here
             ],
             linkerSettings: [
                 .linkedFramework("SwiftUI", .when(platforms: [.macOS])),
