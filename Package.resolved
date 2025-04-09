@@ -1,5 +1,5 @@
 {
-  "originHash" : "cc156140da08d332318bf71c0ff43fe1b9507b69ce4eb256798fd9f59a87a517",
+  "originHash" : "7e9331379f395dd244add6f2c82ecee94b8125aa88fd19f5f8aa1a6ab3fd3c16",
   "pins" : [
     {
       "identity" : "audiokit",
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax",
       "state" : {
-        "revision" : "0687f71944021d616d34d922343dcef086855920",
-        "version" : "600.0.1"
+        "revision" : "2bc86522d115234d1f588efe2bcb4ce4be8f8b82",
+        "version" : "510.0.3"
       }
     },
     {
