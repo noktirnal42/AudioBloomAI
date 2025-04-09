@@ -1,3 +1,59 @@
+    private func updateAudioUniforms() {
+        // Update all uniform fields
+        audioUniforms.audioData = self.audioData
+        audioUniforms.bassLevel = self.bassLevel
+        audioUniforms.midLevel = self.midLevel
+        audioUniforms.trebleLevel = self.trebleLevel
+        audioUniforms.leftLevel = self.leftLevel
+        audioUniforms.rightLevel = self.rightLevel
+        audioUniforms.primaryColor = self.primaryColor
+        audioUniforms.secondaryColor = self.secondaryColor
+        audioUniforms.backgroundColor = self.backgroundColor
+        audioUniforms.sensitivity = self.sensitivity
+        audioUniforms.motionIntensity = self.motionIntensity
+        audioUniforms.themeIndex = Float(self.themeIndex)
+        
+        // Update the buffer
+        updateUniformBuffer()
+    }
+    
+    private func updateUniformBuffer() {
+        guard let uniformsBuffer = uniformsBuffer else { return }
+        
+        // Calculate buffer size for the structure (including array)
+        let audioDataSize = 1024 * MemoryLayout<Float>.stride
+        let otherFieldsSize = MemoryLayout<AudioUniforms>.stride - (1024 * MemoryLayout<Float>.stride)
+        let totalSize = audioDataSize + otherFieldsSize
+        
+        // Get pointer to buffer contents
+        let bufferPointer = uniformsBuffer.contents()
+        
+        // Copy audio data
+        let audioDataPtr = bufferPointer
+        memcpy(audioDataPtr, &audioUniforms.audioData, audioDataSize)
+        
+        // Copy other fields (skip the audioData array)
+        let otherFieldsPtr = bufferPointer.advanced(by: audioDataSize)
+        var otherFields = AudioUniforms()
+        otherFields.bassLevel = audioUniforms.bassLevel
+        otherFields.midLevel = audioUniforms.midLevel
+        otherFields.trebleLevel = audioUniforms.trebleLevel
+        otherFields.leftLevel = audioUniforms.leftLevel
+        otherFields.rightLevel = audioUniforms.rightLevel
+        otherFields.primaryColor = audioUniforms.primaryColor
+        otherFields.secondaryColor = audioUniforms.secondaryColor
+        otherFields.backgroundColor = audioUniforms.backgroundColor
+        otherFields.time = audioUniforms.time
+        otherFields.sensitivity = audioUniforms.sensitivity
+        otherFields.motionIntensity = audioUniforms.motionIntensity
+        otherFields.themeIndex = audioUniforms.themeIndex
+        
+        // Copy other fields portion (exclude the audio data array)
+        let otherFieldsOffset = MemoryLayout.offset(of: \AudioUniforms.bassLevel)!
+        memcpy(otherFieldsPtr, 
+               ((UnsafeMutableRawPointer)(&otherFields)).advanced(by: otherFieldsOffset), 
+               
+
 import Foundation
 import Metal
 import MetalKit

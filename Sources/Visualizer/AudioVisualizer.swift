@@ -1,3 +1,83 @@
+    private func cleanup() {
+        // Cancel timers
+        fpsUpdateTimer?.invalidate()
+        fpsUpdateTimer = nil
+        
+        // Cancel subscriptions
+        cancellables.forEach { $0.cancel() }
+        cancellables.removeAll()
+        
+        // Pause visualization
+        isActive = false
+        
+        // Clear cached data
+        lastAudioData = []
+        lastLevels = (0, 0)
+    }
+}
+
+// MARK: - VisualizationParameterReceiver Extension
+
+extension AudioVisualizer: VisualizationParameterReceiver {
+    /// Updates parameters for the visualization
+    public func updateParameters(_ parameters: [String: Any]) {
+        // Update sensitivity if provided
+        if let sensitivity = parameters["sensitivity"] as? Float {
+            self.sensitivity = sensitivity
+        }
+        
+        // Update motion intensity if provided
+        if let motionIntensity = parameters["motionIntensity"] as? Float {
+            self.motionIntensity = motionIntensity
+        }
+        
+        // Update theme if provided
+        if let themeName = parameters["theme"] as? String,
+           let theme = VisualTheme(rawValue: themeName) {
+            self.currentTheme = theme
+        }
+        
+        // Pass the parameters to the renderer
+        updateVisualizationParameters()
+    }
+}
+
+// MARK: - SwiftUI Previews
+
+#if DEBUG
+struct AudioVisualizerPreviews: PreviewProvider {
+    static var previews: some View {
+        VStack {
+            Text("Audio Visualizer")
+                .font(.headline)
+            
+            let visualizer = AudioVisualizer()
+            visualizer.createMetalView()
+                .frame(width: 400, height: 300)
+                .onAppear {
+                    visualizer.initialize()
+                    visualizer.start()
+                    
+                    // Simulate some audio data
+                    let mockData = AudioData(
+                        frequencyData: Array(repeating: 0, count: 1024).enumerated().map { i, _ in
+                            Float(sin(Double(i) / 100.0) * 0.5 + 0.5)
+                        },
+                        timeData: [],
+                        leftLevel: 0.7,
+                        rightLevel: 0.8,
+                        timestamp: Date()
+                    )
+                    
+                    visualizer.processAudioData(mockData)
+                }
+        }
+        .padding()
+        .background(Color.black)
+    }
+}
+#endif
+
 import Foundation
 import Combine
 import SwiftUI

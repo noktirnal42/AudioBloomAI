@@ -39,8 +39,8 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     /// The AVAudioEngine instance for system audio (if available)
     private let systemAudioEngine = AVAudioEngine()
     
-    /// Flag indicating if the engine is running
-    private var isRunning = false
+    /// FFT helper for frequency analysis
+    private var fftHelper: FFTHelper?
     
     /// Types of audio sources
     public enum AudioSourceType: String, CaseIterable, Identifiable {
@@ -120,103 +120,66 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     /// Processing queue for audio analysis
     private let processingQueue = DispatchQueue(label: "com.audiobloom.audioprocessing", qos: .userInteractive)
     
+    
     /// Timer for polling audio data
     private var audioPollingTimer: Timer?
     
-    /// Initializes a new AudioEngine
+    /// Flag indicating if the audio engine is running
+    private var isRunning = false
     public init() {
         // Initialize with default FFT size
         self.fftHelper = FFTHelper(fftSize: AudioBloomCore.Constants.defaultFFTSize)
         
         // Setup notification observers for audio engine interruptions
         NotificationCenter.default.addObserver(
-                            let name = deviceName as String
-                            
-                            // Check if it's an output device
-                            var outputScopeProperty = AudioObjectPropertyAddress(
-                                mSelector: kAudioDevicePropertyStreamConfiguration,
-                                mScope: kAudioDevicePropertyScopeOutput,
-                                mElement: kAudioObjectPropertyElementMaster
-                            )
-                            
-                            var outputPropertySize: UInt32 = 0
-                            result = AudioObjectGetPropertyDataSize(deviceID, &outputScopeProperty, 0, nil, &outputPropertySize)
-                            
-                            if result == 0 && outputPropertySize > 0 {
-                                // This is an output device
-                                let device = AudioDevice(
-                                    id: String(deviceID),
-                                    name: name,
-                                    manufacturer: "Unknown",
-                                    isInput: false,
-                                    sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
-                                    channelCount: 2
-                                )
-                                outputDevices.append(device)
-                            }
-                            
-                            // Check if it's an input device
-                            var inputScopeProperty = AudioObjectPropertyAddress(
-                                mSelector: kAudioDevicePropertyStreamConfiguration,
-                                mScope: kAudioDevicePropertyScopeInput,
-                                mElement: kAudioObjectPropertyElementMaster
-                            )
-                            
-                            var inputPropertySize: UInt32 = 0
-                            result = AudioObjectGetPropertyDataSize(deviceID, &inputScopeProperty, 0, nil, &inputPropertySize)
-                            
-                            if result == 0 && inputPropertySize > 0 {
-                                // This is an input device
-                                let device = AudioDevice(
-                                    id: String(deviceID),
-                                    name: name,
-                                    manufacturer: "Unknown",
-                                    isInput: true,
-                                    sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
-                                    channelCount: 2
-                                )
-                                inputDevices.append(device)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        #else
-        // For iOS, the device selection is much simpler
-        let inputDevices = [AudioDevice(
-            id: "default",
-            name: "Default Input",
-            manufacturer: "Apple",
-            isInput: true,
-            sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
-            channelCount: 2
-        )]
+            self,
+            selector: #selector(handleAudioEngineInterruption(_:)),
+            name: AVAudioEngine.configurationChangeNotification,
+            object: avAudioEngine
+        )
         
-        let outputDevices = [AudioDevice(
-            id: "default",
-            name: "Default Output",
-            manufacturer: "Apple",
-            isInput: false,
-            sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
-            channelCount: 2
-        )]
+        // Set up device observer for monitoring audio device changes
+        #if os(macOS)
+        // On macOS, we use Core Audio to monitor device changes
+        let deviceChangeSelector = kAudioHardwarePropertyDevices
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: deviceChangeSelector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        
+        // Setup callback for device changes
+        let deviceListenerProc: AudioObjectPropertyListenerProc = { _, _, _, _ -> OSStatus in
+            // Post notification for device changes
+            NotificationCenter.default.post(name: Notification.Name("AudioDeviceListChanged"), object: nil)
+            return noErr
+        }
+        
+        let status = AudioObjectAddPropertyListener(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            deviceListenerProc,
+            nil
+        )
+        
+        if status == noErr {
+            // Add observer for our custom notification
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(refreshAudioDevices),
+                name: Notification.Name("AudioDeviceListChanged"),
+                object: nil
+            )
+        } else {
+            print("Failed to add audio device listener: \(status)")
+        }
         #endif
         
-        // Update our published properties on the main thread
-        DispatchQueue.main.async {
-            self.availableInputDevices = inputDevices
-            self.availableOutputDevices = outputDevices
-            
-            // Set default devices if none selected
-            if self.selectedInputDevice == nil && !inputDevices.isEmpty {
-                self.selectedInputDevice = inputDevices.first
-            }
-            
-            if self.selectedOutputDevice == nil && !outputDevices.isEmpty {
-                self.selectedOutputDevice = outputDevices.first
-            }
-        }
+        // Initialize available devices
+        refreshAudioDevices()
+        
+        // Configure the audio engine
+        configureAudioEngine()
     }
     
     // MARK: - Device Selection
@@ -425,6 +388,22 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     public func getAudioDataPublisher() -> AudioDataPublisher {
         return audioDataPublisher
     }
+    /// Sets up the audio session for capturing audio
+    public func setupAudioSession() async throws {
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        // iOS devices need to configure AVAudioSession
+        let session = AVAudioSession.sharedInstance()
+        do {
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetooth])
+            try session.setActive(true)
+        } catch {
+            throw AudioBloomCore.Error.audioSessionSetupFailed
+        }
+        #endif
+        
+        // Configure audio engine
+        configureAudioEngine()
+        
         // Check if system audio capture is available and set up if needed
         if audioConfig.enableSystemAudioCapture {
             do {
@@ -613,38 +592,24 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     // MARK: - Device Management
     
     /// Refreshes the list of available audio devices
-    public func refreshAudioDevices() {
+    @objc public func refreshAudioDevices() {
         #if os(macOS)
         // Get all audio devices on macOS
         var inputDevices: [AudioDevice] = []
         var outputDevices: [AudioDevice] = []
         
-        let session = AVAudioSession.sharedInstance()
-        
-        // Get available input devices
-        if let inputs = AVAudioSession.sharedInstance().availableInputs {
-            for input in inputs {
-                let device = AudioDevice(
-                    id: input.uid,
-                    name: input.portName,
-                    manufacturer: "Apple",
-                    isInput: true,
-                    sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
-                    channelCount: 2
-                )
-                inputDevices.append(device)
-            }
-        }
-        
-        // For output devices, we need to use Core Audio APIs
+        // Use Core Audio to enumerate audio devices
         var propertySize: UInt32 = 0
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        
+        // Get the size of the device list
         var result = AudioObjectGetPropertyDataSize(
             AudioObjectID(kAudioObjectSystemObject),
-            &AudioObjectPropertyAddress(
-                mSelector: kAudioHardwarePropertyDevices,
-                mScope: kAudioObjectPropertyScopeGlobal,
-                mElement: kAudioObjectPropertyElementMaster
-            ),
+            &propertyAddress,
             0,
             nil,
             &propertySize
@@ -654,13 +619,10 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
             let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
             var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
             
+            // Get the device IDs
             result = AudioObjectGetPropertyData(
                 AudioObjectID(kAudioObjectSystemObject),
-                &AudioObjectPropertyAddress(
-                    mSelector: kAudioHardwarePropertyDevices,
-                    mScope: kAudioObjectPropertyScopeGlobal,
-                    mElement: kAudioObjectPropertyElementMaster
-                ),
+                &propertyAddress,
                 0,
                 nil,
                 &propertySize,
@@ -671,43 +633,64 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
                 // Process each device
                 for deviceID in deviceIDs {
                     // Get device name
-                    var namePropertySize: UInt32 = 0
                     var nameProperty = AudioObjectPropertyAddress(
                         mSelector: kAudioObjectPropertyName,
                         mScope: kAudioObjectPropertyScopeGlobal,
                         mElement: kAudioObjectPropertyElementMaster
                     )
                     
-                    result = AudioObjectGetPropertyDataSize(deviceID, &nameProperty, 0, nil, &namePropertySize)
+                    var deviceName: CFString = "" as CFString
+                    var namePropertySize = UInt32(MemoryLayout<CFString>.size)
+                    
+                    result = AudioObjectGetPropertyData(deviceID, &nameProperty, 0, nil, &namePropertySize, &deviceName)
+                    
                     if result == 0 {
-                        var deviceName: CFString = "" as CFString
-                        result = AudioObjectGetPropertyData(deviceID, &nameProperty, 0, nil, &namePropertySize, &deviceName)
+                        let name = deviceName as String
                         
-                        if result == 0 {
-                            let name = deviceName as String
-                            
-                            // Check if it's an output device
-                            var outputScopeProperty = AudioObjectPropertyAddress(
-                                mSelector: kAudioDevicePropertyStreamConfiguration,
-                                mScope: kAudioDevicePropertyScopeOutput,
-                                mElement: kAudioObjectPropertyElementMaster
+                        // Check if it's an output device
+                        var outputScopeProperty = AudioObjectPropertyAddress(
+                            mSelector: kAudioDevicePropertyStreamConfiguration,
+                            mScope: kAudioDevicePropertyScopeOutput,
+                            mElement: kAudioObjectPropertyElementMaster
+                        )
+                        
+                        var outputPropertySize: UInt32 = 0
+                        result = AudioObjectGetPropertyDataSize(deviceID, &outputScopeProperty, 0, nil, &outputPropertySize)
+                        
+                        if result == 0 && outputPropertySize > 0 {
+                            // This is an output device
+                            let device = AudioDevice(
+                                id: String(deviceID),
+                                name: name,
+                                manufacturer: "Apple",
+                                isInput: false,
+                                sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+                                channelCount: 2
                             )
-                            
-                            var outputPropertySize: UInt32 = 0
-                            result = AudioObjectGetPropertyDataSize(deviceID, &outputScopeProperty, 0, nil, &outputPropertySize)
-                            
-                            if result == 0 && outputPropertySize > 0 {
-                                // This is an output device
-                                let device = AudioDevice(
-                                    id: String(deviceID),
-                                    name: name,
-                                    manufacturer: "Unknown",
-                                    isInput: false,
-                                    sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
-                                    channelCount: 2
-                                )
-                                outputDevices.append(device)
-                            }
+                            outputDevices.append(device)
+                        }
+                        
+                        // Check if it's an input device
+                        var inputScopeProperty = AudioObjectPropertyAddress(
+                            mSelector: kAudioDevicePropertyStreamConfiguration,
+                            mScope: kAudioDevicePropertyScopeInput,
+                            mElement: kAudioObjectPropertyElementMaster
+                        )
+                        
+                        var inputPropertySize: UInt32 = 0
+                        result = AudioObjectGetPropertyDataSize(deviceID, &inputScopeProperty, 0, nil, &inputPropertySize)
+                        
+                        if result == 0 && inputPropertySize > 0 {
+                            // This is an input device
+                            let device = AudioDevice(
+                                id: String(deviceID),
+                                name: name,
+                                manufacturer: "Apple",
+                                isInput: true,
+                                sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+                                channelCount: 2
+                            )
+                            inputDevices.append(device)
                         }
                     }
                 }
@@ -720,8 +703,68 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
             name: "Default Input",
             manufacturer: "Apple",
             isInput: true,
-            sampleRate: Double(AudioBloomCore.Constants.default
-}
+            sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+            channelCount: 2
+        )]
+        
+        let outputDevices = [AudioDevice(
+            id: "default",
+            name: "Default Output",
+            manufacturer: "Apple",
+            isInput: false,
+            sampleRate: Double(AudioBloomCore.Constants.defaultSampleRate),
+            channelCount: 2
+        )]
+        #endif
+        
+        // Update our published properties on the main thread
+        DispatchQueue.main.async {
+            self.availableInputDevices = inputDevices
+            self.availableOutputDevices = outputDevices
+            
+            // Set default devices if none selected
+            if self.selectedInputDevice == nil && !inputDevices.isEmpty {
+                self.selectedInputDevice = inputDevices.first
+            }
+            
+            if self.selectedOutputDevice == nil && !outputDevices.isEmpty {
+                self.selectedOutputDevice = outputDevices.first
+            }
+        }
+    }
+    
+    /// Cleanup resources when the object is deallocated
+    deinit {
+        // Stop capture if running
+        if isRunning {
+            stopCapture()
+        }
+        
+        // Remove audio tap if installed
+        if let audioTap = audioTap as? AVAudioMixerNode {
+            audioTap.removeTap(onBus: 0)
+        }
+        
+        // Remove notification observers
+        NotificationCenter.default.removeObserver(self)
+        
+        #if os(macOS)
+        // Remove Core Audio property listener
+        var propertyAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMaster
+        )
+        
+        // The listener removal might fail, but that's okay during cleanup
+        _ = AudioObjectRemovePropertyListener(
+            AudioObjectID(kAudioObjectSystemObject),
+            &propertyAddress,
+            nil,
+            nil
+        )
+        #endif
+    }
 
 /// Helper class for performing FFT (Fast Fourier Transform) on audio data
 private class FFTHelper {
