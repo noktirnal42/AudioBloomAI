@@ -56,6 +56,7 @@ let package = Package(
                 "MLEngine",
                 "AudioBloomUI"
             ],
+            exclude: ["README.md"],
             resources: [
                 .process("Resources")
             ]
@@ -68,7 +69,8 @@ let package = Package(
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "Logging", package: "swift-log")
-            ]
+            ],
+            exclude: ["README.md"]
         ),
         
         // Audio processing module
@@ -79,6 +81,7 @@ let package = Package(
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "AudioKit", package: "AudioKit")
             ],
+            exclude: ["README.md"],
             swiftSettings: [
                 // Any swift settings would go here
             ],
@@ -97,6 +100,7 @@ let package = Package(
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "Numerics", package: "swift-numerics")
             ],
+            exclude: ["README.md", "MetalRenderer.swift"], // Exclude duplicate file
             resources: [
                 .process("Resources/Shaders")
             ],
@@ -122,6 +126,7 @@ let package = Package(
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "Logging", package: "swift-log")
             ],
+            exclude: ["README.md"],
             resources: [
                 .process("Resources/Models")
             ],
@@ -148,6 +153,7 @@ let package = Package(
                 "Visualizer",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
             ],
+            exclude: ["README.md", "PresetControlsView.swift"], // Exclude duplicate file
             swiftSettings: [
                 // Any swift settings would go here
             ],
@@ -161,22 +167,26 @@ let package = Package(
         .testTarget(
             name: "AudioBloomTests",
             dependencies: ["AudioBloomCore"],
-            path: "Tests/AudioBloomTests"
+            path: "Tests/AudioBloomTests",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "AudioProcessorTests",
             dependencies: ["AudioProcessor"],
-            path: "Tests/AudioProcessorTests"
+            path: "Tests/AudioProcessorTests",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "VisualizerTests",
             dependencies: ["Visualizer"],
-            path: "Tests/VisualizerTests"
+            path: "Tests/VisualizerTests",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "MLEngineTests",
             dependencies: ["MLEngine"],
-            path: "Tests/MLEngineTests"
+            path: "Tests/MLEngineTests",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "AudioBloomUITests",
@@ -184,5 +194,5 @@ let package = Package(
             path: "Tests/AudioBloomUITests"
         )
     ],
-    swiftLanguageVersions: [.v5]
+    swiftLanguageModes: [.default]
 )
