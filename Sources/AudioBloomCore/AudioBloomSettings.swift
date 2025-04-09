@@ -25,6 +25,14 @@ public class AudioBloomSettings: ObservableObject {
         static let showFPS = "ABSettingsShowFPS"
         static let lastInputDevice = "ABSettingsLastInputDevice"
         static let lastOutputDevice = "ABSettingsLastOutputDevice"
+        static let microphoneVolume = "ABSettingsMicrophoneVolume"
+        static let systemAudioVolume = "ABSettingsSystemAudioVolume"
+        static let mixAudioInputs = "ABSettingsMixAudioInputs"
+        static let beatSensitivity = "ABSettingsBeatSensitivity"
+        static let patternSensitivity = "ABSettingsPatternSensitivity"
+        static let emotionalSensitivity = "ABSettingsEmotionalSensitivity"
+        static let showBeatIndicator = "ABSettingsShowBeatIndicator"
+        static let selectedAudioSource = "ABSettingsSelectedAudioSource"
     }
     
     // MARK: - Defaults
@@ -40,7 +48,14 @@ public class AudioBloomSettings: ObservableObject {
     private static let defaultSpectrumSmoothing: Double = 0.5
     private static let defaultAutoStart: Bool = true
     private static let defaultShowFPS: Bool = false
-    
+    private static let defaultMicrophoneVolume: Float = 1.0
+    private static let defaultSystemAudioVolume: Float = 0.8
+    private static let defaultMixAudioInputs: Bool = false
+    private static let defaultBeatSensitivity: Float = 0.65
+    private static let defaultPatternSensitivity: Float = 0.7
+    private static let defaultEmotionalSensitivity: Float = 0.5
+    private static let defaultShowBeatIndicator: Bool = true
+    private static let defaultSelectedAudioSource: String = "Microphone"
     // MARK: - Properties with UserDefaults Persistence
     
     /// Current visual theme
@@ -154,6 +169,81 @@ public class AudioBloomSettings: ObservableObject {
         }
     }
     
+    /// Microphone volume level (0.0 - 1.0)
+    @Published public var microphoneVolume: Float {
+        didSet {
+            UserDefaults.standard.set(microphoneVolume, forKey: Keys.microphoneVolume)
+            notifyAudioConfigUpdate()
+        }
+    }
+    
+    /// System audio volume level (0.0 - 1.0)
+    @Published public var systemAudioVolume: Float {
+        didSet {
+            UserDefaults.standard.set(systemAudioVolume, forKey: Keys.systemAudioVolume)
+            notifyAudioConfigUpdate()
+        }
+    }
+    
+    /// Whether to mix audio inputs
+    @Published public var mixAudioInputs: Bool {
+        didSet {
+            UserDefaults.standard.set(mixAudioInputs, forKey: Keys.mixAudioInputs)
+            notifyAudioConfigUpdate()
+        }
+    }
+    
+    /// Beat detection sensitivity (0.0 - 1.0)
+    @Published public var beatSensitivity: Float {
+        didSet {
+            UserDefaults.standard.set(beatSensitivity, forKey: Keys.beatSensitivity)
+            notifyVisualizationUpdate()
+        }
+    }
+    
+    /// Pattern recognition sensitivity (0.0 - 1.0)
+    @Published public var patternSensitivity: Float {
+        didSet {
+            UserDefaults.standard.set(patternSensitivity, forKey: Keys.patternSensitivity)
+            notifyVisualizationUpdate()
+        }
+    }
+    
+    /// Emotional content analysis sensitivity (0.0 - 1.0)
+    @Published public var emotionalSensitivity: Float {
+        didSet {
+            UserDefaults.standard.set(emotionalSensitivity, forKey: Keys.emotionalSensitivity)
+            notifyVisualizationUpdate()
+        }
+    }
+    
+    /// Whether to show beat indicator
+    @Published public var showBeatIndicator: Bool {
+        didSet {
+            UserDefaults.standard.set(showBeatIndicator, forKey: Keys.showBeatIndicator)
+            notifyVisualizationUpdate()
+        }
+    }
+    
+    /// Selected audio source type
+    @Published public var selectedAudioSource: String {
+        didSet {
+            UserDefaults.standard.set(selectedAudioSource, forKey: Keys.selectedAudioSource)
+            notifyAudioConfigUpdate()
+        }
+    }
+    
+    /// Convenience accessors for compatibility with PresetManager
+    public var selectedInputDeviceID: String? {
+        get { return lastInputDeviceID }
+        set { lastInputDeviceID = newValue }
+    }
+    
+    public var selectedOutputDeviceID: String? {
+        get { return lastOutputDeviceID }
+        set { lastOutputDeviceID = newValue }
+    }
+    
     /// Visualization modes available in the app
     public enum VisualizationMode: String, CaseIterable, Identifiable {
         case spectrum = "Spectrum"
@@ -246,6 +336,38 @@ public class AudioBloomSettings: ObservableObject {
         // Load device IDs if available
         self.lastInputDeviceID = UserDefaults.standard.string(forKey: Keys.lastInputDevice)
         self.lastOutputDeviceID = UserDefaults.standard.string(forKey: Keys.lastOutputDevice)
+        
+        // Load audio-related settings
+        self.microphoneVolume = UserDefaults.standard.float(forKey: Keys.microphoneVolume)
+        if self.microphoneVolume == 0 { self.microphoneVolume = Self.defaultMicrophoneVolume }
+        
+        self.systemAudioVolume = UserDefaults.standard.float(forKey: Keys.systemAudioVolume)
+        if self.systemAudioVolume == 0 { self.systemAudioVolume = Self.defaultSystemAudioVolume }
+        
+        self.mixAudioInputs = UserDefaults.standard.bool(forKey: Keys.mixAudioInputs)
+        
+        // Load neural-related settings
+        self.beatSensitivity = UserDefaults.standard.float(forKey: Keys.beatSensitivity)
+        if self.beatSensitivity == 0 { self.beatSensitivity = Self.defaultBeatSensitivity }
+        
+        self.patternSensitivity = UserDefaults.standard.float(forKey: Keys.patternSensitivity)
+        if self.patternSensitivity == 0 { self.patternSensitivity = Self.defaultPatternSensitivity }
+        
+        self.emotionalSensitivity = UserDefaults.standard.float(forKey: Keys.emotionalSensitivity)
+        if self.emotionalSensitivity == 0 { self.emotionalSensitivity = Self.defaultEmotionalSensitivity }
+        
+        // Load visualization-related settings
+        self.showBeatIndicator = UserDefaults.standard.bool(forKey: Keys.showBeatIndicator)
+        if !UserDefaults.standard.object(forKey: Keys.showBeatIndicator) {
+            self.showBeatIndicator = Self.defaultShowBeatIndicator
+        }
+        
+        // Load audio source
+        if let source = UserDefaults.standard.string(forKey: Keys.selectedAudioSource) {
+            self.selectedAudioSource = source
+        } else {
+            self.selectedAudioSource = Self.defaultSelectedAudioSource
+        }
     }
     
     // MARK: - Methods
@@ -266,12 +388,24 @@ public class AudioBloomSettings: ObservableObject {
         
         // Clear device selections
         lastInputDeviceID = nil
-        lastOutputDeviceID = nil
+        autoStart = Self.defaultAutoStart
+        showFPS = Self.defaultShowFPS
+        showBeatIndicator = Self.defaultShowBeatIndicator
         
-        // Notify subscribers about the reset
-        notifyVisualizationUpdate()
-        notifyAudioConfigUpdate()
-        notifyPerformanceUpdate()
+        // Reset audio settings
+        microphoneVolume = Self.defaultMicrophoneVolume
+        systemAudioVolume = Self.defaultSystemAudioVolume
+        mixAudioInputs = Self.defaultMixAudioInputs
+        selectedAudioSource = Self.defaultSelectedAudioSource
+        
+        // Reset neural settings
+        beatSensitivity = Self.defaultBeatSensitivity
+        patternSensitivity = Self.defaultPatternSensitivity
+        emotionalSensitivity = Self.defaultEmotionalSensitivity
+        
+        // Clear device selections
+        lastInputDeviceID = nil
+        lastOutputDeviceID = nil
     }
     
     /// Get full parameter dictionary for visualizers
@@ -285,18 +419,26 @@ public class AudioBloomSettings: ObservableObject {
         params["visualizationMode"] = visualizationMode.rawValue
         params["colorIntensity"] = Float(colorIntensity)
         params["spectrumSmoothing"] = Float(spectrumSmoothing)
+        params["beatSensitivity"] = beatSensitivity
+        params["patternSensitivity"] = patternSensitivity
+        params["emotionalSensitivity"] = emotionalSensitivity
+        params["showBeatIndicator"] = showBeatIndicator
         
         return params
     }
     
     /// Get audio configuration
     public func audioConfiguration() -> [String: Any] {
-        [
+        return [
             "sampleRate": Double(audioQuality),
             "fftSize": AudioBloomCore.Constants.defaultFFTSize,
             "channels": 2,
             "inputDeviceID": lastInputDeviceID as Any,
-            "outputDeviceID": lastOutputDeviceID as Any
+            "outputDeviceID": lastOutputDeviceID as Any,
+            "microphoneVolume": microphoneVolume,
+            "systemAudioVolume": systemAudioVolume,
+            "mixAudioInputs": mixAudioInputs,
+            "selectedAudioSource": selectedAudioSource
         ]
     }
     
@@ -351,19 +493,53 @@ public class AudioBloomSettings: ObservableObject {
             showFPS = value
         }
         
+        if let value = dict[Keys.showBeatIndicator] as? Bool {
+            showBeatIndicator = value
+        }
+        
+        // Handle audio settings
+        if let value = dict[Keys.microphoneVolume] as? Float {
+            microphoneVolume = min(max(value, 0), 1)
+        }
+        
+        if let value = dict[Keys.systemAudioVolume] as? Float {
+            systemAudioVolume = min(max(value, 0), 1)
+        }
+        
+        if let value = dict[Keys.mixAudioInputs] as? Bool {
+            mixAudioInputs = value
+        }
+        
+        // Handle neural settings
+        if let value = dict[Keys.beatSensitivity] as? Float {
+            beatSensitivity = min(max(value, 0), 1)
+        }
+        
+        if let value = dict[Keys.patternSensitivity] as? Float {
+            patternSensitivity = min(max(value, 0), 1)
+        }
+        
+        if let value = dict[Keys.emotionalSensitivity] as? Float {
+            emotionalSensitivity = min(max(value, 0), 1)
+        }
+        
+        // Handle audio source
+        if let value = dict[Keys.selectedAudioSource] as? String {
+            selectedAudioSource = value
+        }
+        
+        // Handle device IDs
         // Handle device IDs
         lastInputDeviceID = dict[Keys.lastInputDevice] as? String
         lastOutputDeviceID = dict[Keys.lastOutputDevice] as? String
         
-        // Notify subscribers about all updates
-        notifyVisualizationUpdate()
         notifyAudioConfigUpdate()
         notifyPerformanceUpdate()
     }
     
     /// Exports settings to a dictionary
     public func exportSettings() -> [String: Any] {
-        [
+        return [
             Keys.currentTheme: currentTheme.rawValue,
             Keys.visualizationMode: visualizationMode.rawValue,
             Keys.audioSensitivity: audioSensitivity,
@@ -376,7 +552,15 @@ public class AudioBloomSettings: ObservableObject {
             Keys.autoStart: autoStart,
             Keys.showFPS: showFPS,
             Keys.lastInputDevice: lastInputDeviceID as Any,
-            Keys.lastOutputDevice: lastOutputDeviceID as Any
+            Keys.lastOutputDevice: lastOutputDeviceID as Any,
+            Keys.microphoneVolume: microphoneVolume,
+            Keys.systemAudioVolume: systemAudioVolume,
+            Keys.mixAudioInputs: mixAudioInputs,
+            Keys.beatSensitivity: beatSensitivity,
+            Keys.patternSensitivity: patternSensitivity,
+            Keys.emotionalSensitivity: emotionalSensitivity,
+            Keys.showBeatIndicator: showBeatIndicator,
+            Keys.selectedAudioSource: selectedAudioSource
         ]
     }
     

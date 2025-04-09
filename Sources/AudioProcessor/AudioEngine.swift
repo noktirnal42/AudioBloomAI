@@ -5,6 +5,9 @@ import AudioBloomCore
 import Accelerate
 #if os(macOS)
 import CoreAudio
+import CoreMedia
+import AppKit
+import os.log
 #endif
 
 /// Audio Engine for capturing and processing audio data
@@ -31,6 +34,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     @Published public private(set) var activeAudioSource: AudioSourceType = .microphone
     
     /// Audio data publisher for subscribers
+    /// Audio data publisher for subscribers
     private let audioDataPublisher = AudioDataPublisher()
     
     /// The AVAudioEngine instance for audio processing
@@ -42,6 +46,8 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     /// FFT helper for frequency analysis
     private var fftHelper: FFTHelper?
     
+    /// Logger for audio processing
+    private let logger = Logger(subsystem: "com.audiobloom.audioprocessor", category: "AudioEngine")
     /// Types of audio sources
     public enum AudioSourceType: String, CaseIterable, Identifiable {
         case microphone = "Microphone"
@@ -314,21 +320,32 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     #endif
     
     // MARK: - System Audio Capture
-    
     /// Sets up system audio capture on macOS
+    /// 
+    /// This method configures the capture of system audio using macOS audio APIs.
+    /// It uses AVCaptureSession to capture system audio output and routes it to the
+    /// AVAudioEngine for processing. This implementation requires user permission
+    /// to access screen recording (which includes system audio capture capability).
+    ///
+    /// - Throws: AudioBloomCore.Error.systemAudioCaptureSetupFailed if setup fails
     private func setupSystemAudioCapture() throws {
         #if os(macOS)
-        // On macOS, capturing system audio requires special setup
-        // This is a simplified implementation. In a real-world app,
-        // you would need a more robust approach or a third-party solution
+        logger.info("Setting up system audio capture")
+        
+        // Check if screen capturing is permitted (required for system audio)
+        guard CGPreflightScreenCaptureAccess() else {
+            // Request screen capture permission if not already granted
+            if CGRequestScreenCaptureAccess() {
+                logger.info("Screen capture access granted")
+            } else {
+                logger.error("Screen capture access denied - cannot capture system audio")
+                throw AudioBloomCore.Error.systemAudioCaptureSetupFailed
+            }
+        }
         
         // Create a mixer node for system audio
         let systemMixer = AVAudioMixerNode()
         systemAudioEngine.attach(systemMixer)
-        
-        // Set up a virtual input that can capture system audio
-        // Note: This is where you'd integrate with third-party solutions like BlackHole
-        // For simplicity, we'll simulate system audio using a tone generator
         
         let mainMixer = self.mainMixer ?? AVAudioMixerNode()
         if self.mainMixer == nil {
@@ -336,52 +353,107 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
             self.mainMixer = mainMixer
         }
         
-        // For demonstration, create an oscillator to simulate system audio
-        let oscillator = AVAudioSourceNode { _, _, frameCount, audioBufferList -> OSStatus in
-            let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
+        // Set up audio capture using AVCaptureSession
+        let captureSession = AVCaptureSession()
+        captureSession.beginConfiguration()
+        
+        // Find audio device for system audio
+        guard let systemAudioDevice = AVCaptureDevice.default(for: .audio) else {
+            logger.error("No default audio capture device found")
+            throw AudioBloomCore.Error.systemAudioCaptureSetupFailed
+        }
+        
+        // Create capture input
+        do {
+            let audioInput = try AVCaptureDeviceInput(device: systemAudioDevice)
             
-            // Simple sine wave generation at 440Hz
-            for frame in 0..<Int(frameCount) {
-                let value = Float(sin(2.0 * .pi * 440.0 * Double(frame) / Double(AudioBloomCore.Constants.defaultSampleRate)))
+            if captureSession.canAddInput(audioInput) {
+                captureSession.addInput(audioInput)
+                logger.debug("Added system audio input to capture session")
+            } else {
+                logger.error("Could not add audio input to capture session")
+                throw AudioBloomCore.Error.systemAudioCaptureSetupFailed
+            }
+            
+            // Create audio data output
+            let audioOutput = AVCaptureAudioDataOutput()
+            let processingQueue = DispatchQueue(label: "com.audiobloom.systemaudio", qos: .userInteractive)
+            
+            audioOutput.setSampleBufferDelegate(self, queue: processingQueue)
+            
+            if captureSession.canAddOutput(audioOutput) {
+                captureSession.addOutput(audioOutput)
+                logger.debug("Added system audio output to capture session")
+            } else {
+                logger.error("Could not add audio output to capture session")
+                throw AudioBloomCore.Error.systemAudioCaptureSetupFailed
+            }
+            
+            // Configure format
+            let formatDescription = audioOutput.connections.first?.audioChannels.first?.formatDescription
+            
+            captureSession.commitConfiguration()
+            captureSession.startRunning()
+            
+            // Create a tap to handle system audio
+            let systemAudioTap = AVAudioSourceNode { [weak self] _, _, frameCount, audioBufferList -> OSStatus in
+                guard let self = self else { return noErr }
                 
-                // Apply volume and scale
-                let scaledValue = value * 0.3 * self.audioConfig.systemAudioVolume
+                let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
                 
-                // Fill all channels with the same value
-                for buffer in ablPointer {
-                    let bufferPointer = UnsafeMutableBufferPointer<Float>(
-                        start: buffer.mData?.assumingMemoryBound(to: Float.self),
-                        count: Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
-                    )
-                    bufferPointer[frame] = scaledValue
+                // Access the last received system audio data
+                self.systemAudioLock.lock()
+                defer { self.systemAudioLock.unlock() }
+                
+                for frame in 0..<Int(frameCount) {
+                    let frameIdx = frame % self.systemAudioBuffer.count
+                    let value = self.systemAudioBuffer[frameIdx] * self.audioConfig.systemAudioVolume
+                    
+                    // Fill all channels with the value
+                    for buffer in ablPointer {
+                        let bufferPointer = UnsafeMutableBufferPointer<Float>(
+                            start: buffer.mData?.assumingMemoryBound(to: Float.self),
+                            count: Int(buffer.mDataByteSize) / MemoryLayout<Float>.size
+                        )
+                        bufferPointer[frame] = value
+                    }
+                }
+                
+                return noErr
+            }
+            
+            avAudioEngine.attach(systemAudioTap)
+            
+            // Set the system audio node
+            systemAudioNode = systemAudioTap
+            
+            // Connect the system audio to the main mixer if we're mixing inputs
+            if audioConfig.mixInputs {
+                let format = AVAudioFormat(
+                    commonFormat: .pcmFormatFloat32,
+                    sampleRate: AudioBloomCore.Constants.defaultSampleRate,
+                    channels: 2,
+                    interleaved: false
+                )
+                
+                if let format = format {
+                    avAudioEngine.connect(systemAudioTap, to: mainMixer, format: format)
+                    logger.debug("Connected system audio to main mixer")
                 }
             }
             
-            return noErr
-        }
-        
-        avAudioEngine.attach(oscillator)
-        
-        // Set the system audio node
-        systemAudioNode = oscillator
-        
-        // Connect the oscillator to the main mixer if we're mixing inputs
-        if audioConfig.mixInputs {
-            let format = AVAudioFormat(
-                commonFormat: .pcmFormatFloat32,
-                sampleRate: AudioBloomCore.Constants.defaultSampleRate,
-                channels: 2,
-                interleaved: false
-            )
+            logger.info("System audio capture setup complete")
             
-            if let format = format {
-                avAudioEngine.connect(oscillator, to: mainMixer, format: format)
-            }
+        } catch {
+            logger.error("Error setting up system audio capture: \(error.localizedDescription)")
+            throw AudioBloomCore.Error.systemAudioCaptureSetupFailed
         }
-        
-        // In a real implementation, you would set up system audio capture
-        // using a virtual audio device or Audio Device Aggregation
         #endif
+    }
+    
+    // Buffer to store system audio data
+    private var systemAudioBuffer = [Float](repeating: 0, count: 8192)
+    private let systemAudioLock = NSLock()
     }
     
     /// Returns an audio data publisher for subscribers
@@ -416,25 +488,55 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Starts audio capture
+    /// Starts audio capture
+    /// 
+    /// This method starts the AVAudioEngine and begins the audio capture process.
+    /// It sets up all necessary components for audio processing and starts the
+    /// audio polling timer.
+    ///
+    /// - Throws: AudioBloomCore.Error.audioEngineStartFailed if the audio engine fails to start
     public func startCapture() throws {
-        guard !isRunning else { return }
+        guard !isRunning else { 
+            logger.notice("Audio capture already running, ignoring start request")
+            return 
+        }
         
+        logger.info("Starting audio capture")
         do {
             try avAudioEngine.start()
+            if audioConfig.enableSystemAudioCapture && activeAudioSource != .microphone {
+                try systemAudioEngine.start()
+                logger.debug("System audio engine started")
+            }
             startAudioPolling()
             isRunning = true
+            logger.info("Audio capture started successfully")
         } catch {
+            logger.error("Failed to start audio engine: \(error.localizedDescription)")
             throw AudioBloomCore.Error.audioEngineStartFailed
         }
     }
-    
     /// Stops audio capture
+    /// 
+    /// This method stops the AVAudioEngine and ends the audio capture process.
+    /// It cleans up all running audio components and stops the audio polling timer.
     public func stopCapture() {
-        guard isRunning else { return }
+        guard isRunning else {
+            logger.notice("Audio capture not running, ignoring stop request")
+            return
+        }
         
+        logger.info("Stopping audio capture")
         stopAudioPolling()
         avAudioEngine.stop()
+        
+        if audioConfig.enableSystemAudioCapture {
+            systemAudioEngine.stop()
+            logger.debug("System audio engine stopped")
+        }
+        
         isRunning = false
+        logger.info("Audio capture stopped successfully")
     }
     
     /// Configures the audio engine components
@@ -766,10 +868,6 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
         #endif
     }
 
-/// Helper class for performing FFT (Fast Fourier Transform) on audio data
-private class FFTHelper {
-    /// Size of the FFT
-    private let fftSize: Int
     
     /// FFT setup for real signal
     private var fftSetup: vDSP_DFT_Setup?

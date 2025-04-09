@@ -1,15 +1,16 @@
 // swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
+// Optimized for macOS 15+ and Xcode 16+
 
 import PackageDescription
 
 let package = Package(
     name: "AudioBloomAI",
     platforms: [
-        .macOS(.v15)
+        .macOS(.v15) // Specific requirement for macOS 15+
     ],
     products: [
-        // Main application
+        // Main executable application
         .executable(
             name: "AudioBloomApp",
             targets: ["AudioBloomApp"]
@@ -34,12 +35,13 @@ let package = Package(
             name: "AudioBloomUI", 
             targets: ["AudioBloomUI"]
         )
-    ],
-        .package(url: "https://github.com/apple/swift-algorithms", from: "1.0.0"),
-        .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.5.3"),
-        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.5.0"),
-        .package(url: "https://github.com/AudioKit/AudioKit", from: "5.6.0")
+    dependencies: [
+        // External dependencies
+        .package(url: "https://github.com/apple/swift-algorithms", from: "1.2.1"),
+        .package(url: "https://github.com/apple/swift-numerics", from: "1.0.3"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.6.3"),
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.19.0"),
+        .package(url: "https://github.com/AudioKit/AudioKit", from: "5.6.5")
     ],
     targets: [
         // Main application target
@@ -52,6 +54,7 @@ let package = Package(
                 "MLEngine",
                 "AudioBloomUI"
             ],
+            exclude: ["README.md"],
             resources: [
                 .process("Resources")
             ]
@@ -64,7 +67,8 @@ let package = Package(
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "Logging", package: "swift-log")
-            ]
+            ],
+            exclude: ["README.md"]
         ),
         
         // Audio processing module
@@ -75,9 +79,14 @@ let package = Package(
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "AudioKit", package: "AudioKit")
             ],
+            exclude: ["README.md"],
+            swiftSettings: [
+                // Any swift settings would go here
+            ],
             linkerSettings: [
                 .linkedFramework("AVFoundation", .when(platforms: [.macOS])),
-                .linkedFramework("CoreAudio", .when(platforms: [.macOS]))
+                .linkedFramework("CoreAudio", .when(platforms: [.macOS])),
+                .linkedFramework("Accelerate", .when(platforms: [.macOS]))
             ]
         ),
         
@@ -89,16 +98,21 @@ let package = Package(
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "Numerics", package: "swift-numerics")
             ],
+            exclude: ["README.md"], // Removed MetalRenderer.swift from exclusions
             resources: [
                 .process("Resources/Shaders")
             ],
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
             ],
+            swiftSettings: [
+                // Any swift settings would go here
+            ],
             linkerSettings: [
                 .linkedFramework("Metal", .when(platforms: [.macOS])),
                 .linkedFramework("MetalKit", .when(platforms: [.macOS])),
-                .linkedFramework("CoreImage", .when(platforms: [.macOS]))
+                .linkedFramework("CoreImage", .when(platforms: [.macOS])),
+                .linkedFramework("QuartzCore", .when(platforms: [.macOS]))
             ]
         ),
         
@@ -110,18 +124,21 @@ let package = Package(
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "Logging", package: "swift-log")
             ],
+            exclude: ["README.md"],
             resources: [
                 .process("Resources/Models")
             ],
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
             ],
-            linkerSettings: [
-                .linkedFramework("CoreML", .when(platforms: [.macOS])),
-                .linkedFramework("Accelerate", .when(platforms: [.macOS]))
-            ],
             swiftSettings: [
                 .define("ENABLE_NEURAL_ENGINE")
+            ],
+            linkerSettings: [
+                .linkedFramework("CoreML", .when(platforms: [.macOS])),
+                .linkedFramework("Accelerate", .when(platforms: [.macOS])),
+                .linkedFramework("CreateML", .when(platforms: [.macOS])),
+                .linkedFramework("SoundAnalysis", .when(platforms: [.macOS]))
             ]
         ),
         
@@ -131,7 +148,16 @@ let package = Package(
             dependencies: [
                 "AudioBloomCore",
                 "MLEngine",
+                "Visualizer",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
+            ],
+            exclude: ["README.md"], // Removed PresetControlsView.swift from exclusions
+            swiftSettings: [
+                // Any swift settings would go here
+            ],
+            linkerSettings: [
+                .linkedFramework("SwiftUI", .when(platforms: [.macOS])),
+                .linkedFramework("Combine", .when(platforms: [.macOS]))
             ]
         ),
         
@@ -139,27 +165,32 @@ let package = Package(
         .testTarget(
             name: "AudioBloomTests",
             dependencies: ["AudioBloomCore"],
-            path: "Tests/AudioBloomTests"
+            path: "Tests/AudioBloomTests",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "AudioProcessorTests",
             dependencies: ["AudioProcessor"],
-            path: "Tests/AudioProcessorTests"
+            path: "Tests/AudioProcessorTests",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "VisualizerTests",
             dependencies: ["Visualizer"],
-            path: "Tests/VisualizerTests"
+            path: "Tests/VisualizerTests",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "MLEngineTests",
             dependencies: ["MLEngine"],
-            path: "Tests/MLEngineTests"
+            path: "Tests/MLEngineTests",
+            exclude: ["README.md"]
         ),
         .testTarget(
             name: "AudioBloomUITests",
             dependencies: ["AudioBloomUI"],
             path: "Tests/AudioBloomUITests"
         )
-    ]
+    ],
+    swiftLanguageModes: [.version("6")]
 )

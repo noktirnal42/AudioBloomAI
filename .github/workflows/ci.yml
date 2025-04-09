@@ -1,0 +1,155 @@
+name: AudioBloomAI CI/CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+        - development
+        - staging
+        - production
+
+jobs:
+  lint:
+    name: Code Quality Checks
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Install SwiftLint
+        run: brew install swiftlint
+        
+      - name: Run SwiftLint
+        run: swiftlint lint --reporter github-actions-logging
+  
+  build-and-test:
+    name: Build and Test
+    needs: lint
+    runs-on: macos-14
+    strategy:
+      matrix:
+        env: [development, staging, production]
+    env:
+      ENVIRONMENT: ${{ matrix.env }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      
+      - name: Build
+        run: |
+          xcodebuild clean build -project AudioBloomAI.xcodeproj \
+            -scheme AudioBloomAI \
+            -destination 'platform=macOS' \
+            -configuration Debug \
+            ENVIRONMENT=${{ matrix.env }} | xcpretty && exit ${PIPESTATUS[0]}
+      
+      - name: Run tests
+        run: |
+          xcodebuild test -project AudioBloomAI.xcodeproj \
+            -scheme AudioBloomAI \
+            -destination 'platform=macOS' \
+            -configuration Debug \
+            ENVIRONMENT=${{ matrix.env }} | xcpretty && exit ${PIPESTATUS[0]}
+
+  generate-documentation:
+    name: Generate Documentation
+    needs: build-and-test
+    runs-on: macos-14
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Generate Documentation
+        run: |
+          xcodebuild docbuild -project AudioBloomAI.xcodeproj \
+            -scheme AudioBloomAI \
+            -destination 'platform=macOS' \
+            -derivedDataPath ./DerivedData
+
+      - name: Upload Documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: documentation
+          path: ./DerivedData/Build/Products/Debug/AudioBloomAI.doccarchive
+
+  validate-assets:
+    name: Validate Assets
+    runs-on: macos-14
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Check image files
+        run: |
+          echo "Validating image assets..."
+          find . -path "*/Resources/*.png" -exec file {} \; | grep -v "PNG image data" && exit 1 || echo "All PNG files are valid"
+          
+      - name: Check audio files 
+        run: |
+          echo "Validating audio assets..."
+          find . -path "*/Resources/*.wav" -exec file {} \; | grep -v "WAVE audio" && exit 1 || echo "All WAV files are valid"
+          find . -path "*/Resources/*.mp3" -exec file {} \; | grep -v "Audio file" && exit 1 || echo "All MP3 files are valid"
+
+  deploy:
+    name: Deploy
+    needs: [build-and-test, generate-documentation, validate-assets]
+    runs-on: macos-14
+    if: |
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      github.event_name == 'workflow_dispatch'
+    environment: ${{ github.event.inputs.environment || 'development' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        
+      - name: Set up Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+          
+      - name: Build for deployment
+        run: |
+          echo "Building for ${{ github.event.inputs.environment || 'development' }} environment"
+          xcodebuild clean archive -project AudioBloomAI.xcodeproj \
+            -scheme AudioBloomAI \
+            -destination 'platform=macOS' \
+            -archivePath ./build/AudioBloomAI.xcarchive \
+            ENVIRONMENT=${{ github.event.inputs.environment || 'development' }}
+          
+      - name: Export application
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath ./build/AudioBloomAI.xcarchive \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath ./build
+          
+      - name: Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: AudioBloomAI-${{ github.event.inputs.environment || 'development' }}
+          path: ./build/AudioBloomAI.app
+
