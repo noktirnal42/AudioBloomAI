@@ -7,13 +7,57 @@ import CoreML
 import QuartzCore
 import MetalKit
 import Logging
+
 /// Bridge connecting audio data providers to ML processors
-public class AudioBridge {
+public final class AudioBridge: @unchecked Sendable {
+    // MARK: - Types
+    
+    /// Connection state of the bridge
+    public enum ConnectionState: String {
+        case disconnected
+        case connecting
+        case connected
+        case active
+        case inactive
+        case error
+    }
+    
+    /// Errors that can occur in the audio bridge
+    public enum AudioBridgeError: Error, CustomStringConvertible {
+        case dataConversionFailed
+        case connectionFailed(String)
+        case streamingFailed(String)
+        case processingFailed(String)
+        
+        public var description: String {
+            switch self {
+            case .dataConversionFailed: 
+                return "Failed to convert audio data"
+            case .connectionFailed(let details):
+                return "Connection failed: \(details)"
+            case .streamingFailed(let details):
+                return "Streaming failed: \(details)"
+            case .processingFailed(let details):
+                return "Processing failed: \(details)"
+            }
+        }
+    }
+    
+    /// Performance metrics for the audio bridge
+    public struct PerformanceMetrics: Sendable {
+        public var framesPerSecond: Double = 0
+        public var eventsPerMinute: Double = 0
+        public var errorRate: Double = 0
+        public var averageProcessingTime: Double = 0
+        public var conversionEfficiency: Double = 0
+        
+        public init() {}
+    }
+    
     // MARK: - Properties
     
-    /// The ML processor for analysis
-    private let mlProcessor: MLProcessorProtocol
-    
+    /// Logger instance
+    private let logger = Logger(label: "com.audiobloom.bridge")
     /// The audio data provider
     private weak var audioProvider: AudioDataProvider?
     
@@ -30,16 +74,16 @@ public class AudioBridge {
     private let processingQueue = DispatchQueue(label: "com.audiobloom.bridge", qos: .userInteractive)
     
     /// Format converter for audio processing
-    private let formatConverter = FormatConverter()
+    private let formatConverter: FormatConverter
     
-    /// Performance tracker
-    private let performanceTracker = PerformanceTracker()
-    
-    /// Logger instance
-    private let logger = Logger(label: "com.audiobloom.audiobridge")
+    /// Audio ML processor for AI analysis
+    private let mlProcessor: MLProcessorProtocol
     
     /// Publisher for visualization data
     private let visualizationSubject = PassthroughSubject<VisualizationData, Never>()
+    
+    /// Thread safety lock
+    private let lock = NSLock()
     
     // MARK: - FFT Properties
     
@@ -47,7 +91,7 @@ public class AudioBridge {
     private var fftSetup: OpaquePointer?
     
     /// Window buffer for FFT processing
-    private var windowBuffer: [Float]?
+    private var windowBuffer = [Float]()
     
     /// FFT size for processing (power of 2)
     private let fftSize = 1024
@@ -79,22 +123,16 @@ public class AudioBridge {
     
     /// Publisher for visualization data
     public var visualizationPublisher: AnyPublisher<VisualizationData, Never> {
-        return visualizationSubject.eraseToAnyPublisher()
-    }
-    
-    /// Current state of the connection
-    public var state: ConnectionState {
-        return connectionState
-    }
-    
+        return visualizatio    
     // MARK: - Initialization
     
     /// Initializes the bridge with an ML processor
     /// - Parameter mlProcessor: The ML processor to use for analysis
     public init(mlProcessor: MLProcessorProtocol) {
         self.mlProcessor = mlProcessor
-        setupMLSubscription()
-        initializeFFT()
+        self.formatConverter = FormatConverter()
+        self.initializeFFT()
+        self.setupMLSubscription()
     }
     
     /// Initialize FFT components
@@ -108,9 +146,9 @@ public class AudioBridge {
         
         // Create window buffer
         windowBuffer = [Float](repeating: 0, count: fftSize)
-        if let windowBuffer = windowBuffer {
-            vDSP_hann_window(&windowBuffer, vDSP_Length(fftSize), Int32(vDSP_HANN_NORM))
-        }
+        var window = windowBuffer
+        vDSP_hann_window(&window, vDSP_Length(fftSize), Int32(vDSP_HANN_NORM))
+        windowBuffer = window
     }
     
     deinit {
@@ -124,72 +162,16 @@ public class AudioBridge {
         }
         
         // Ensure disconnection
-        disconnect()
+        self.disconnect()
     }
     
     // MARK: - Private Methods
     
     /// Updates the connection state and notifies listeners
     private func updateConnectionState(_ newState: ConnectionState) {
+        lock.lock()
         connectionState = newState
-        
-        // Notify of state change
-        NotificationCenter.default.post(
-            name: .audioBridgeStateChanged,
-            object: self,
-            userInfo: ["state": connectionState]
-        )
-    }
-    
-    /// Sets up subscription to ML processor visualization data
-    private func setupMLSubscription() {
-        // First, cancel any existing subscription
-        mlVisualizationSubscription?.cancel()
-        
-        // Create new subscription if we have a processor
-        if let mlProcessor = mlProcessor {
-            mlVisualizationSubscription = mlProcessor.visualizationDataPublisher
-                .receive(on: processingQueue)
-                .sink { [weak self] visualizationData in
-                    // Forward the visualization data
-                    self?.visualizationSubject.send(visualizationData)
-                    
-                    // Track performance for significant events
-                    if visualizationData.isSignificantEvent {
-                        self?.performanceTracker.recordSignificantEvent()
-                    }
-                }
-        }
-    }
-    
-    /// Processes audio data received from the provider
-    private func processAudioData(_ audioData: AudioData) {
-        // Skip processing if not active
-        guard connectionState == .active, let mlProcessor = mlProcessor else {
-            return
-        }
-        
-        // Track performance
-        let processingStartTime = CFAbsoluteTimeGetCurrent()
-        performanceTracker.beginProcessing()
-        
-        // Convert audio data to the format needed by the ML processor
-        do {
-            let processableData = try formatConverter.convertForProcessing(audioData)
-            
-            // Process the data
-            Task {
-                do {
-                    // Process data through ML processor
-                    try await mlProcessor.processAudioData(processableData)
-                    
-                    // Track performance
-                    let endTime = CFAbsoluteTimeGetCurrent()
-                    let processingTime = endTime - processingStartTime
-                    
-                    recordProcessingTime(processingTime)
-                    performanceTracker.endProcessing()
-                    
+        lock.unlock()
                     // Update metrics
                     updatePerformanceMetrics()
                 } catch {
