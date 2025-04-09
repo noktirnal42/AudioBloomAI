@@ -1,7 +1,6 @@
 // AudioShaders.metal
 // Enhanced visualization effects for AudioBloomAI
 //
-
 #include <metal_stdlib>
 using namespace metal;
 
@@ -516,20 +515,19 @@ kernel void spawn_particles(
     system->attractorStrength = 0.1 + uniforms.beatDetected * 0.2;
 }
 
-/// 2D fbm noise helper for particle system
-float fbm2d(float2 p, int octaves) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 1.0;
-    for(int i = 0; i < octaves; i++) {
-        // Use existing noise function from AudioVisualizer.metal
-        value += amplitude * noise(p * frequency);
-        amplitude *= 0.5;
-        frequency *= 2.0;
-    }
-    return value;
-}
-
+    } else if (uniforms.themeIndex < 3.0) {
+        // Monochrome theme - single color bars
+        color.rgb = mix(color.rgb, float3(1.0), intensity * 0.9);
+    } else {
+        // Cosmic theme - starfield with spectrum
+        float3 cosmicColor = mix(uniforms.primaryColor.rgb, uniforms.secondaryColor.rgb, sin(uv.y * 10.0 + uniforms.time) * 0.5 + 0.5);
+        color.rgb = mix(color.rgb, cosmicColor, intensity * 0.7);
+        
+        // Add stars
+        float starNoise = random(uv * 50.0);
+        float star = step(0.98, starNoise) * (sin(uniforms.time * 3.0 + starNoise * 10.0) * 0.5 + 0.5);
+        color.rgb += star * uniforms.accentColor.rgb;
+=======
 /// Render a particle system
 float4 render_particles(float2 uv, float4 baseColor, constant AudioUniforms &uniforms, device ParticleSystem *system) {
     float4 color = baseColor;
@@ -1015,11 +1013,48 @@ float4 render_neural_pattern(float2 uv, float4 baseColor, constant AudioUniforms
             // Add to final color
             color.rgb += state->colorPalette[i % 4].rgb * flare;
         }
+>>>>>>> main
     }
     
     return color;
 }
 
+<<<<<<< HEAD
+// Waveform visualization fragment effects
+float4 waveform_fragment_effect(float2 uv, float4 baseColor, constant AudioUniforms &uniforms, float audioIntensity) {
+    float4 color = baseColor;
+    
+    // Create oscilloscope-like effect
+    float centerY = 0.5; // Center of waveform
+    float waveThickness = 0.02 * uniforms.sensitivity;
+    
+    // Calculate waveform height at this x-position
+    int waveIndex = int(uv.x * 1024);
+    float waveHeight = uniforms.audioData[waveIndex] * uniforms.sensitivity;
+    float waveY = centerY + waveHeight * 0.4; // Scale for visibility
+    
+    // Calculate distance to the wave line
+    float dist = abs(uv.y - waveY);
+    float waveIntensity = smoothstep(waveThickness, 0.0, dist);
+    
+    // Add time-based movement
+    float timeOffset = sin(uniforms.time * 2.0) * 0.01 * uniforms.motionIntensity;
+    waveIntensity += smoothstep(waveThickness, 0.0, abs(uv.y - (waveY + timeOffset))) * 0.5;
+    
+    // Apply different themes
+    if (uniforms.themeIndex < 1.0) {
+        // Classic theme - crisp line
+        color.rgb = mix(color.rgb, uniforms.primaryColor.rgb, waveIntensity);
+        
+        // Add subtle background grid
+        float grid = max(
+            smoothstep(0.03, 0.02, abs(fract(uv.x * 10.0) - 0.5)),
+            smoothstep(0.03, 0.02, abs(fract(uv.y * 10.0) - 0.5))
+        ) * 0.2;
+        color.rgb = mix(color.rgb, uniforms.secondaryColor.rgb, grid);
+    } else if (uniforms
+
+=======
 //-----------------------------------------------------------
 // Visualization Processing Utilities
 //-----------------------------------------------------------
@@ -1093,3 +1128,4 @@ float4 blend_visualization_modes(
 //-----------------------------------------------------------
 // End of Enhanced Visualization Effects
 //-----------------------------------------------------------
+>>>>>>> main

@@ -1,0 +1,149 @@
+name: "Documentation (AI-Ready)"
+description: "Request or propose documentation updates structured for AI processing"
+title: "[Docs] "
+labels: ["type:documentation", "ai-ready"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Documentation Request
+        Thank you for taking the time to fill out this documentation template! This format is optimized for AI agent processing.
+        
+  - type: input
+    id: documentation-summary
+    attributes:
+      label: Documentation Summary
+      description: A clear and concise summary of the documentation need
+      placeholder: "Example: Add API documentation for AudioFeatureExtractor class"
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: documentation-type
+    attributes:
+      label: Documentation Type
+      description: What type of documentation is this?
+      options:
+        - API Documentation
+        - User Guide
+        - Tutorial
+        - Architecture Overview
+        - Code Comments
+        - README Update
+        - Wiki Page
+        - Sample Code
+        - Performance Notes
+        - Other
+    validations:
+      required: true
+      
+  - type: textarea
+    id: documentation-scope
+    attributes:
+      label: Documentation Scope
+      description: Describe what should be documented and the boundaries of this documentation task
+      placeholder: |
+        This documentation should cover:
+        - The AudioFeatureExtractor class public methods
+        - Input/output formats
+        - Performance characteristics
+        - Usage examples
+    validations:
+      required: true
+      
+  - type: textarea
+    id: documentation-requirements
+    attributes:
+      label: Documentation Requirements
+      description: Specific details about what the documentation should include
+      placeholder: |
+        The documentation should include:
+        - Method signatures with parameter descriptions
+        - Return value explanations
+        - Error handling information
+        - Performance constraints
+        - Thread-safety considerations
+    validations:
+      required: true
+      
+  - type: textarea
+    id: code-references
+    attributes:
+      label: Code References
+      description: Specific code files, classes, methods, or functions that need documentation
+      placeholder: |
+        - `Sources/MLEngine/AudioFeatureExtractor.swift`
+        - `AudioFeatureExtractor.extractFeatures(from:options:)`
+        - `AudioFeatureExtractor.FrequencyBandOptions` struct
+      render: plain
+    validations:
+      required: true
+      
+  - type: textarea
+    id: existing-documentation
+    attributes:
+      label: Existing Documentation
+      description: Information about how this fits with existing documentation
+      placeholder: |
+        This should be added to the existing API documentation in wiki-content/API-Documentation.md
+        
+        Current related documentation:
+        - Audio Pipeline documentation in Architecture-Overview.md
+        - General MLEngine documentation in Module-Documentation.md
+      
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component of the system does this documentation relate to?
+      options:
+        - AudioProcessor
+        - MLEngine
+        - AudioBloomCore
+        - Visualizer
+        - AudioBloomUI
+        - AudioBloomApp
+        - General
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: What is the priority of this documentation?
+      options:
+        - P0-critical
+        - P1-high
+        - P2-medium
+        - P3-low
+    validations:
+      required: true
+      
+  - type: textarea
+    id: audience
+    attributes:
+      label: Target Audience
+      description: Who is the primary audience for this documentation?
+      placeholder: |
+        - Library users
+        - Core developers
+        - New contributors
+        - End users
+    validations:
+      required: true
+      
+  - type: input
+    id: linked-issues
+    attributes:
+      label: Linked Issues/PRs
+      description: Related issues or pull requests (use GitHub issue/PR numbers)
+      placeholder: "#28, #30"
+      
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any other information that might be helpful
+      placeholder: "Include any additional context, diagrams, or example snippets"
+

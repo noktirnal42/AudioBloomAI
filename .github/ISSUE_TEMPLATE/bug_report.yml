@@ -1,0 +1,135 @@
+name: "Bug Report (AI-Ready)"
+description: "Submit a bug report that's structured for AI processing"
+title: "[Bug] "
+labels: ["type:bug", "ai-ready"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        Thank you for taking the time to fill out this bug report! This format is optimized for AI agent processing.
+        
+  - type: input
+    id: bug-summary
+    attributes:
+      label: Bug Summary
+      description: A clear and concise description of the bug
+      placeholder: "Example: App crashes when processing audio files larger than 10MB"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Load file '....'
+        4. See error
+    validations:
+      required: true
+      
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen
+      placeholder: "The app should process the file and display visualization"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: What actually happens when following the steps
+      placeholder: "The app freezes and then crashes after 5 seconds"
+    validations:
+      required: true
+      
+  - type: textarea
+    id: error-messages
+    attributes:
+      label: Error Messages
+      description: Paste any error messages or stack traces if available
+      placeholder: |
+        Exception: NSInternalInconsistencyException
+        Reason: Invalid audio buffer configuration
+        Stack trace:
+        #0 0x00000001052c3b40 in AudioBloomAI::AudioProcessor::processBuffer(...)
+        #1 0x00000001052c4d30 in AudioBloomAI::AudioEngine::captureAudio(...)
+      render: shell
+      
+  - type: textarea
+    id: system-info
+    attributes:
+      label: System Information
+      description: Provide details about your system
+      placeholder: |
+        - Device: MacBook Pro (2023)
+        - OS: macOS 15.4
+        - App Version: 1.2.0
+        - Xcode Version: 16.0
+        - Swift Version: 6.0
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component of the system is affected?
+      options:
+        - AudioProcessor
+        - MLEngine
+        - AudioBloomCore
+        - Visualizer
+        - AudioBloomUI
+        - AudioBloomApp
+        - Unknown
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How severe is this bug?
+      options:
+        - Critical (App crash/data loss)
+        - Major (Feature completely broken)
+        - Moderate (Feature partially broken)
+        - Minor (Cosmetic issue)
+    validations:
+      required: true
+      
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      description: How often does this bug occur?
+      options:
+        - Always (100%)
+        - Frequently (>50%)
+        - Sometimes (<50%)
+        - Rarely (<10%)
+        - Once
+    validations:
+      required: true
+      
+  - type: textarea
+    id: additional-info
+    attributes:
+      label: Additional Information
+      description: Any other relevant information about the problem
+      placeholder: "Include any other context, screenshots, or videos about the bug here."
+      
+  - type: input
+    id: related-issues
+    attributes:
+      label: Related Issues
+      description: List any related issues (use GitHub issue numbers)
+      placeholder: "#42, #24"
+

@@ -12,10 +12,9 @@ let package = Package(
     products: [
         // Main executable application
         .executable(
-            name: "AudioBloomAI",
+            name: "AudioBloomApp",
             targets: ["AudioBloomApp"]
         ),
-        // Libraries that can be reused
         .library(
             name: "AudioBloomCore",
             targets: ["AudioBloomCore"]
@@ -25,15 +24,15 @@ let package = Package(
             targets: ["AudioProcessor"]
         ),
         .library(
-            name: "MLEngine",
-            targets: ["MLEngine"]
-        ),
-        .library(
-            name: "Visualizer",
+            name: "Visualizer", 
             targets: ["Visualizer"]
         ),
         .library(
-            name: "AudioBloomUI",
+            name: "MLEngine", 
+            targets: ["MLEngine"]
+        ),
+        .library(
+            name: "AudioBloomUI", 
             targets: ["AudioBloomUI"]
         )
     ],
