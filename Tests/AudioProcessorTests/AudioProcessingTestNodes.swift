@@ -6,7 +6,7 @@ import XCTest
 
 /// Simple passthrough node that doesn't modify the signal
 final class PassthroughNode: AudioProcessingNode {
-    
+
     /// Process the audio buffer without any modifications
     /// - Parameters:
     ///   - buffer: Input audio buffer
@@ -21,13 +21,13 @@ final class PassthroughNode: AudioProcessingNode {
 final class GainNode: AudioProcessingNode {
     /// The gain factor to apply to the audio samples
     let gain: Float
-    
+
     /// Initialize a gain node with the specified gain factor
     /// - Parameter gain: Gain multiplier (1.0 = unity gain)
     init(gain: Float) {
         self.gain = gain
     }
-    
+
     /// Apply gain to all samples in the buffer
     /// - Parameters:
     ///   - buffer: Input audio buffer
@@ -40,7 +40,7 @@ final class GainNode: AudioProcessingNode {
 
 /// Node that inverts the phase of the signal
 final class InvertNode: AudioProcessingNode {
-    
+
     /// Invert the phase of all samples (multiply by -1)
     /// - Parameters:
     ///   - buffer: Input audio buffer
@@ -55,7 +55,7 @@ final class InvertNode: AudioProcessingNode {
 
 /// Node that applies different processing to each channel
 final class ChannelAwareNode: AudioProcessingNode {
-    
+
     /// Process stereo audio with channel-specific processing
     /// Left channel is amplified by 2.0, right channel is attenuated by 0.5
     /// - Parameters:
@@ -64,7 +64,7 @@ final class ChannelAwareNode: AudioProcessingNode {
     /// - Returns: Processed audio buffer with channel-specific gain
     func process(buffer: [Float], config: AudioProcessingConfig) throws -> [Float] {
         var result = buffer
-        
+
         // Process each stereo pair (left and right channels)
         for channelPairIndex in stride(from: 0, to: buffer.count, by: 2) {
             // Check if left channel index is valid
@@ -72,7 +72,7 @@ final class ChannelAwareNode: AudioProcessingNode {
                 // Amplify left channel
                 result[channelPairIndex] = buffer[channelPairIndex] * 2.0
             }
-            
+
             // Check if right channel index is valid
             let rightChannelIndex = channelPairIndex + 1
             if rightChannelIndex < buffer.count {
@@ -80,14 +80,14 @@ final class ChannelAwareNode: AudioProcessingNode {
                 result[rightChannelIndex] = buffer[rightChannelIndex] * 0.5
             }
         }
-        
+
         return result
     }
 }
 
 /// Node that swaps stereo channels
 final class ChannelMapperNode: AudioProcessingNode {
-    
+
     /// Process stereo audio by swapping left and right channels
     /// For mono audio, passes through unchanged
     /// - Parameters:
@@ -99,9 +99,9 @@ final class ChannelMapperNode: AudioProcessingNode {
             // Only works on stereo signals
             return buffer
         }
-        
+
         var output = buffer
-        
+
         // Process each stereo pair, swapping left and right channels
         for channelPairIndex in stride(from: 0, to: buffer.count, by: 2) {
             // Only swap if we have both left and right channels
@@ -109,12 +109,12 @@ final class ChannelMapperNode: AudioProcessingNode {
             guard rightIndex < buffer.count else {
                 continue
             }
-            
+
             // Swap left and right channels
             output[channelPairIndex] = buffer[rightIndex]
             output[rightIndex] = buffer[channelPairIndex]
         }
-        
+
         return output
     }
 }
@@ -125,10 +125,10 @@ final class ChannelMapperNode: AudioProcessingNode {
 final class SampleRateConverterNode: AudioProcessingNode {
     /// The input sample rate in Hz
     let inputRate: Double
-    
+
     /// The ratio between output and input sample rates
     let inputToOutputRatio: Double
-    
+
     /// Initialize a sample rate converter node
     /// - Parameters:
     ///   - inputRate: The input audio sample rate in Hz
@@ -137,7 +137,7 @@ final class SampleRateConverterNode: AudioProcessingNode {
         self.inputRate = inputRate
         self.inputToOutputRatio = outputRate / inputRate
     }
-    
+
     /// Process audio by simulating sample rate conversion
     /// This is a simple nearest-neighbor implementation for testing purposes
     /// - Parameters:
@@ -148,17 +148,17 @@ final class SampleRateConverterNode: AudioProcessingNode {
         // Simple sample rate conversion simulation
         let outputSize = Int(Double(buffer.count) * inputToOutputRatio)
         var output = [Float](repeating: 0.0, count: outputSize)
-        
+
         for outputSampleIndex in 0..<outputSize {
             let inputIndexFloat = Double(outputSampleIndex) / inputToOutputRatio
             let inputIndex = Int(inputIndexFloat)
-            
+
             // Only copy sample if it's within the input buffer bounds
             if inputIndex < buffer.count {
                 output[outputSampleIndex] = buffer[inputIndex]
             }
         }
-        
+
         return output
     }
 }
@@ -172,7 +172,7 @@ final class ErrorThrowingNode: AudioProcessingNode {
         /// Simulated processing failure for testing error handling
         case processingFailed
     }
-    
+
     /// Always throws a processing error
     /// - Parameters:
     ///   - buffer: Input audio buffer
@@ -188,7 +188,7 @@ final class ErrorThrowingNode: AudioProcessingNode {
 final class OperationCounterNode: AudioProcessingNode {
     /// The number of times process() has been called
     var processCount = 0
-    
+
     /// Process the audio buffer and increment the operation counter
     /// - Parameters:
     ///   - buffer: Input audio buffer
@@ -199,4 +199,5 @@ final class OperationCounterNode: AudioProcessingNode {
         return buffer
     }
 }
+
 
