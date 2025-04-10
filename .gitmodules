@@ -1,0 +1,3 @@
+[submodule "AudioBloomAI.wiki"]
+	path = AudioBloomAI.wiki
+	url = git@github.com:noktirnal42/AudioBloomAI.wiki.git
