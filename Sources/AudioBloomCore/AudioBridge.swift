@@ -9,11 +9,11 @@ import MetalKit
 import Logging
 
 /// Bridge connecting audio data providers to ML processors
-public final class AudioBridge: @unchecked Sendable {
+public actor AudioBridge: Sendable {
     // MARK: - Types
     
     /// Connection state of the bridge
-    public enum ConnectionState: String {
+    public enum ConnectionState: String, Sendable {
         case disconnected
         case connecting
         case connected
@@ -23,7 +23,7 @@ public final class AudioBridge: @unchecked Sendable {
     }
     
     /// Errors that can occur in the audio bridge
-    public enum AudioBridgeError: Error, CustomStringConvertible {
+    public enum AudioBridgeError: Error, CustomStringConvertible, Sendable {
         case dataConversionFailed
         case connectionFailed(String)
         case streamingFailed(String)
@@ -45,10 +45,15 @@ public final class AudioBridge: @unchecked Sendable {
     
     /// Performance metrics for the audio bridge
     public struct PerformanceMetrics: Sendable {
+        /// Frames processed per second
         public var framesPerSecond: Double = 0
+        /// Events detected per minute
         public var eventsPerMinute: Double = 0
+        /// Errors per minute
         public var errorRate: Double = 0
+        /// Average processing time per frame (ms)
         public var averageProcessingTime: Double = 0
+        /// Efficiency of audio conversion (0-1)
         public var conversionEfficiency: Double = 0
         
         public init() {}
@@ -58,6 +63,7 @@ public final class AudioBridge: @unchecked Sendable {
     
     /// Logger instance
     private let logger = Logger(label: "com.audiobloom.bridge")
+    
     /// The audio data provider
     private weak var audioProvider: AudioDataProvider?
     
@@ -78,6 +84,9 @@ public final class AudioBridge: @unchecked Sendable {
     
     /// Audio ML processor for AI analysis
     private let mlProcessor: MLProcessorProtocol
+    
+    /// Subject for visualization data
+    private let visualizationSubject = PassthroughSubject<VisualizationData, Never>()
     
     /// Publisher for visualization data
     public var visualizationPublisher: AnyPublisher<VisualizationData, Never> {
