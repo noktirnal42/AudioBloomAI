@@ -1,0 +1,7 @@
+// Split AudioPipelineCoreTests.swift into smaller files
+
+1. Basic Pipeline Tests
+2. State Management Tests
+3. Connection Tests
+4. Validation Tests
+5. Error Handling Tests
