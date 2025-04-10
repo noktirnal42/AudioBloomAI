@@ -57,9 +57,7 @@ let package = Package(
             ],
             exclude: ["README.md"],
             resources: [
-                .process("Resources"),
-                .process("Resources/Assets"),
-                .process("Resources/SupportFiles")
+                .copy("Resources")
             ]
         ),
         
@@ -109,8 +107,7 @@ let package = Package(
             ],
             exclude: ["README.md"],
             resources: [
-                .process("Resources"),
-                .process("Resources/Shaders")
+                .copy("Resources/Shaders")
             ],
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
@@ -136,9 +133,7 @@ let package = Package(
             ],
             exclude: ["README.md"],
             resources: [
-                .process("Resources"),
-                .process("Resources/Models"),
-                .process("Resources/Config")
+                .process("Resources")
             ],
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
@@ -165,9 +160,8 @@ let package = Package(
             ],
             exclude: ["README.md"],
             resources: [
-                .process("Resources"),
                 .process("Resources/Assets"),
-                .process("Views/Resources")
+                .copy("Views/Resources", rename: "ViewResources")
             ],
             swiftSettings: [
                 // Any swift settings would go here
@@ -181,50 +175,47 @@ let package = Package(
         // Test targets
         .testTarget(
             name: "AudioBloomTests",
-            dependencies: ["AudioBloomCore"],
-            path: "Tests/AudioBloomTests",
-            exclude: ["README.md"],
+            dependencies: [
+                "AudioBloomCore",
+                "AudioProcessor",
+                "Visualizer",
+                "MLEngine",
+                "AudioBloomUI"
+            ],
             resources: [
-                .process("Resources"),
-                .process("TestData")
+                .copy("Resources"),
+                .copy("TestData", rename: "TestAssets")
             ]
         ),
         .testTarget(
             name: "AudioProcessorTests",
             dependencies: ["AudioProcessor"],
-            path: "Tests/AudioProcessorTests",
-            exclude: ["README.md"],
             resources: [
-                .process("Resources")
+                .copy("Resources")
             ]
         ),
         .testTarget(
             name: "VisualizerTests",
             dependencies: ["Visualizer"],
-            path: "Tests/VisualizerTests",
-            exclude: ["README.md"],
             resources: [
-                .process("Resources")
+                .copy("Resources")
             ]
         ),
         .testTarget(
             name: "MLEngineTests",
             dependencies: ["MLEngine"],
-            path: "Tests/MLEngineTests",
-            exclude: ["README.md"],
             resources: [
-                .process("Resources"),
-                .process("TestData")
+                .copy("Resources"),
+                .copy("TestData", rename: "TestAssets")
             ]
         ),
         .testTarget(
             name: "AudioBloomUITests",
             dependencies: ["AudioBloomUI"],
-            path: "Tests/AudioBloomUITests",
             resources: [
-                .process("Resources")
+                .copy("Resources")
             ]
         )
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageVersions: [.v6]
 )
