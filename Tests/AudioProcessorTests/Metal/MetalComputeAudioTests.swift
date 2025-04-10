@@ -12,38 +12,37 @@ import Accelerate
 @available(macOS 15.0, *)
 final class MetalComputeAudioTests: XCTestCase {
     // MARK: - Test Variables
-    
+
     /// Metal compute core instance under test
     private var metalCore: MetalComputeCore!
-    
+
     /// Buffer IDs to track and clean up
     private var allocatedBuffers: [UInt64] = []
-    
+
     // MARK: - Setup and Teardown
-    
+
     override func setUp() async throws {
         try await super.setUp()
-        
+
         // Skip Metal tests if we're on a device that doesn't support Metal
         try XCTSkipIf(
             MTLCreateSystemDefaultDevice() == nil,
             "Skipping Metal tests - no Metal device available"
         )
-        
+
         // Initialize Metal compute core
         metalCore = try MetalComputeCore(maxConcurrentOperations: 3)
-        
+
         // Reset tracking arrays
         allocatedBuffers = []
     }
-    
+
     override func tearDown() async throws {
         // Release any allocated buffers
         for bufferId in allocatedBuffers {
             metalCore.releaseBuffer(id: bufferId)
         }
         allocatedBuffers = []
-        
         // Release Metal compute core
         metalCore = nil
         
@@ -146,5 +145,84 @@ final class MetalComputeAudioTests: XCTestCase {
         // Create sine wave input for FFT
         let sampleRate: Float = 44100.0
         let frequency: Float = 1000.0 // 1kHz sine wave
-        let duration: Float
+        let duration: Float = 0.05 // 50ms
+        
+        // Generate sine wave and ensure it's a power of 2 in length
+        var sineWave = generateSineWave(frequency: frequency, sampleRate: sampleRate, duration: duration)
+        let fftSize = nextPowerOfTwo(sineWave.count)
+        
+        // Pad to power of 2 if needed
+        if sineWave.count < fftSize {
+            sineWave.append(contentsOf: [Float](repeating: 0, count: fftSize - sineWave.count))
+        }
+        
+        // Create input and output buffers
+        let inputBufferId = try createTestBuffer(size: fftSize)
+        try sineWave.withUnsafeBytes { bytes in
+            try metalCore.updateBuffer(
+                id: inputBufferId,
+                from: bytes.baseAddress!,
+                length: fftSize * MemoryLayout<Float>.stride
+            )
+        }
+        
+        // Create output buffer for complex FFT results (each complex number has 2 float components)
+        let outputBufferId = try createTestBuffer(size: fftSize, fillValue: 0.0)
+        
+        // Perform FFT
+        let expectation = XCTestExpectation(description: "FFT Completion")
+        
+        metalCore.performFFT(
+            inputBufferId: inputBufferId,
+            outputBufferId: outputBufferId,
+            sampleCount: fftSize,
+            inverse: false
+        ) { result in
+            switch result {
+            case .success:
+                expectation.fulfill()
+            case .failure(let error):
+                XCTFail("FFT failed with error: \(error)")
+            }
+        }
+        
+        // Wait for FFT to complete
+        await fulfillment(of: [expectation], timeout: 5.0)
+        
+        // Read output buffer
+        let fftOutput = try readBufferData(bufferId: outputBufferId, size: fftSize)
+        
+        // Analyze the FFT results
+        // For a sine wave, we expect significant energy at the frequency bin corresponding to our input
+        
+        // Calculate which bin should have our frequency
+        let binWidth = Float(sampleRate) / Float(fftSize)
+        let expectedBin = Int(frequency / binWidth)
+        
+        // Find the bin with maximum magnitude
+        var maxBin = 0
+        var maxMagnitude: Float = 0.0
+        
+        // Process the first half of the FFT result (due to Nyquist)
+        for binIndex in 0..<(fftSize / 2) {
+            // For a real FFT, results are stored as complex values
+            let realValue = fftOutput[binIndex * 2]
+            let imagValue = fftOutput[binIndex * 2 + 1]
+            let magnitude = sqrt(realValue * realValue + imagValue * imagValue)
+            
+            if magnitude > maxMagnitude {
+                maxMagnitude = magnitude
+                maxBin = binIndex
+            }
+        }
+        
+        // Due to FFT binning and windowing effects, the peak may not be exactly at the expected bin
+        // We allow for a small margin of error
+        let binError = 2
+        XCTAssertTrue(
+            abs(maxBin - expectedBin) <= binError,
+            "FFT should detect frequency at correct bin (expected: \(expectedBin), got: \(maxBin))"
+        )
+    }
+}
 
