@@ -1,0 +1,14 @@
+line_length: 120
+type_body_length: 300
+file_length: 350
+function_body_length: 50
+identifier_name:
+  min_length: 3
+  excluded:
+    - id
+    - up
+    - url
+    - dx
+    - dy
+trailing_whitespace:
+  ignores_empty_lines: true
