@@ -182,6 +182,7 @@ let package = Package(
                 "MLEngine",
                 "AudioBloomUI"
             ],
+            exclude: ["README.md"],
             resources: [
                 .copy("Resources"),
                 .copy("TestResources")
@@ -190,6 +191,7 @@ let package = Package(
         .testTarget(
             name: "AudioProcessorTests",
             dependencies: ["AudioProcessor"],
+            exclude: ["README.md"],
             resources: [
                 .copy("Resources")
             ]
@@ -197,6 +199,7 @@ let package = Package(
         .testTarget(
             name: "VisualizerTests",
             dependencies: ["Visualizer"],
+            exclude: ["README.md"],
             resources: [
                 .copy("Resources")
             ]
@@ -204,6 +207,7 @@ let package = Package(
         .testTarget(
             name: "MLEngineTests",
             dependencies: ["MLEngine"],
+            exclude: ["README.md"],
             resources: [
                 .copy("Resources"),
                 .copy("TestResources")
@@ -212,6 +216,7 @@ let package = Package(
         .testTarget(
             name: "AudioBloomUITests",
             dependencies: ["AudioBloomUI"],
+            exclude: ["README.md"],
             resources: [
                 .copy("Resources")
             ]
