@@ -8,7 +8,7 @@ final class MetalProcessingTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        metalCore = try! MetalComputeCore()
+        metalCore = try MetalComputeCore()
     }
     
     override func tearDown() {
