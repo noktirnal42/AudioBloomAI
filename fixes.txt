@@ -1,0 +1,15 @@
+// NeuralEngine.swift fixes
+bufferCount += increment;  // Change to shorthand
+modelConfiguration += updates;  // Change to shorthand
+
+// AudioBridge.swift fixes
+frameCount += 1;  // Change to shorthand
+
+// ModelConfiguration.swift fixes
+let model = try configuration.model  // Remove force cast
+
+// MetalComputeCore.swift fixes
+typealias BufferStats = (active: Int, pooled: Int)  // Reduce tuple size
+
+// PresetControlsView.swift fixes
+let isSelectedExport = true  // Fix naming convention
