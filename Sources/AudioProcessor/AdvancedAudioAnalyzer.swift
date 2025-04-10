@@ -9,6 +9,7 @@ import AVFoundation
 import Combine
 import CoreML
 import AudioBloomCore
+import AudioBloomCore.Audio
 import Metal
 
 /// Advanced audio analysis system that provides sophisticated audio feature extraction, 
