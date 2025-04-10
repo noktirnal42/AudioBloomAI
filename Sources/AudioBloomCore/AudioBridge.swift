@@ -9,6 +9,18 @@ import MetalKit
 import Logging
 
 /// Bridge connecting audio data providers to ML processors
+/// Protocol for ML processor that generates visualization data
+public protocol MLProcessorProtocol: AnyObject, Sendable {
+    /// Publisher for visualization data
+    var visualizationDataPublisher: AnyPublisher<VisualizationData, Never> { get }
+    
+    /// Processes audio data
+    /// - Parameter audioData: The audio data to process
+    /// - Throws: Error if processing fails
+    func processAudioData(_ audioData: [Float]) async throws
+}
+
+/// Bridge connecting audio data providers to ML processors
 public actor AudioBridge: Sendable {
     // MARK: - Types
     

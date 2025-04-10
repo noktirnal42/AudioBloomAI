@@ -161,7 +161,7 @@ let package = Package(
             exclude: ["README.md"],
             resources: [
                 .process("Resources/Assets"),
-                .copy("Views/Resources", rename: "ViewResources")
+                .copy("Views/Resources")
             ],
             swiftSettings: [
                 // Any swift settings would go here
@@ -184,7 +184,7 @@ let package = Package(
             ],
             resources: [
                 .copy("Resources"),
-                .copy("TestData", rename: "TestAssets")
+                .copy("TestResources")
             ]
         ),
         .testTarget(
@@ -206,7 +206,7 @@ let package = Package(
             dependencies: ["MLEngine"],
             resources: [
                 .copy("Resources"),
-                .copy("TestData", rename: "TestAssets")
+                .copy("TestResources")
             ]
         ),
         .testTarget(
