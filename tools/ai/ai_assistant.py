@@ -395,5 +395,12 @@ class AIAssistant:
     
     def analyze_code(self, file_path: str) -> Dict[str, Any]:
         """
-        Analyze a
+        Analyze a Swift code file and provide feedback.
+        
+        Args:
+            file_path: Path to the Swift file to analyze
+            
+        Returns:
+            Dictionary containing analysis results and metadata
+        """
 
