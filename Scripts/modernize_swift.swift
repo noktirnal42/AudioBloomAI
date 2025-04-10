@@ -47,7 +47,7 @@ class SwiftFileModernizer {
         }
         
         // Read file contents
-        guard var content = try? String(contentsOfFile: path) else {
+        guard var content = try? String(contentsOfFile: path, encoding: .utf8) else {
             print("  Failed to read file")
             return
         }
@@ -99,8 +99,9 @@ class SwiftFileModernizer {
     func addAvailabilityAttribute(to content: String) -> String {
         var lines = content.components(separatedBy: .newlines)
         var inComment = false
+        var i = 0
         
-        for i in 0..<lines.count {
+        while i < lines.count {
             let line = lines[i]
             
             // Skip comment blocks
@@ -126,6 +127,7 @@ class SwiftFileModernizer {
                     i += 1
                 }
             }
+            i += 1
         }
         
         return lines.joined(separator: "\n")

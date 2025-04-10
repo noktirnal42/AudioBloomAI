@@ -8,8 +8,6 @@ import SoundAnalysis
 import Logging
 import os.signpost
 /// Errors that can occur during ML processing
-/// Uses Swift 6 actor isolation for thread safety.
-@available(macOS 15.0, *)
 public enum MLProcessorError: Error {
     case featureExtractionFailed(Error)
     case modelNotLoaded
@@ -37,29 +35,21 @@ public enum MLProcessorError: Error {
 }
 
 /// Protocol for ML processing status updates
-/// Uses Swift 6 actor isolation for thread safety.
-@available(macOS 15.0, *)
 public protocol MLProcessingDelegate: AnyObject {
     /// Called when the processor's ready state changes
-/// Uses Swift 6 actor isolation for thread safety.
     func mlProcessorReadyStateChanged(isReady: Bool)
     
     /// Called when an error occurs during processing
-/// Uses Swift 6 actor isolation for thread safety.
     func mlProcessorDidEncounterError(_ error: Error)
     
     /// Called when performance metrics are updated
-/// Uses Swift 6 actor isolation for thread safety.
     func mlProcessorDidUpdateMetrics(_ metrics: MLProcessor.PerformanceMetrics)
 }
 
 /// ML Processor for analyzing audio data and generating visual effects
-/// Uses Swift 6 actor isolation for thread safety.
 
 // Dummy implementation of AudioPipelineProtocol for backward compatibility
-@available(macOS 15.0, *)
-fileprivate actor DummyAudioPipeline: AudioPipelineProtocol  {
-    // Converted to actor in Swift 6 for thread safety
+fileprivate class DummyAudioPipeline: AudioPipelineProtocol {
     func subscribe(bufferSize: Int, hopSize: Int, callback: @escaping (AudioBufferID, TimeInterval) -> Void) -> UUID {
         return UUID()
     }
@@ -79,69 +69,52 @@ fileprivate actor DummyAudioPipeline: AudioPipelineProtocol  {
     }
 }
 
-@available(macOS 15.0, *)
-public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, VisualizationDataReceiver, AudioDataConsumer  {
-    // Converted to actor in Swift 6 for thread safety
+public class MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, VisualizationDataReceiver, AudioDataConsumer {
     /// Published ML model output data for visualization
-/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var outputData: [Float] = []
     
     /// Published audio features from analysis
-/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var audioFeatures = AudioFeatures()
     
     /// Published performance metrics
-/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var performanceMetrics = PerformanceMetrics()
     
     /// Published processing state
-/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var state: ProcessingState = .inactive
     
     /// Audio feature extractor
-/// Uses Swift 6 actor isolation for thread safety.
     private var featureExtractor: AudioFeatureExtractor
     
     /// Model configuration
-/// Uses Swift 6 actor isolation for thread safety.
     private var modelConfig: ModelConfiguration
     
     /// Output transformer
-/// Uses Swift 6 actor isolation for thread safety.
     private var outputTransformer: OutputTransformer
     
     /// Core ML model
-/// Uses Swift 6 actor isolation for thread safety.
     private var mlModel: MLModel?
     
     /// Processing task for continuous processing
-/// Uses Swift 6 actor isolation for thread safety.
     private var processingTask: Task<Void, Never>?
     
     /// Logger for this class
-/// Uses Swift 6 actor isolation for thread safety.
     private let logger = Logger(label: "com.audiobloom.mlprocessor")
     
     /// Signpost log for performance tracking
-/// Uses Swift 6 actor isolation for thread safety.
     private let signposter = OSSignposter(subsystem: "com.audiobloom.mlprocessor", category: "Processing")
     
     /// Subject for publishing visualization data
-/// Uses Swift 6 actor isolation for thread safety.
     private let visualizationDataSubject = PassthroughSubject<VisualizationData, Never>()
     
     /// Publisher for visualization data
-/// Uses Swift 6 actor isolation for thread safety.
     public var visualizationDataPublisher: AnyPublisher<VisualizationData, Never> {
         visualizationDataSubject.eraseToAnyPublisher()
     }
     
     /// Delegate for ML processing status updates
-/// Uses Swift 6 actor isolation for thread safety.
     public weak var delegate: MLProcessingDelegate?
     
     /// Whether to use Neural Engine optimizations when available
-/// Uses Swift 6 actor isolation for thread safety.
     public var useNeuralEngine: Bool = true {
         didSet {
             if useNeuralEngine != oldValue {
@@ -152,11 +125,9 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// The audio format used for processing
-/// Uses Swift 6 actor isolation for thread safety.
     private var audioFormat: AVAudioFormat?
     
     /// The optimization level for the processor
-/// Uses Swift 6 actor isolation for thread safety.
     public var optimizationLevel: OptimizationLevel = .balanced {
         didSet {
             if optimizationLevel != oldValue {
@@ -167,14 +138,11 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Flag indicating if the ML pipeline is ready for processing
-/// Uses Swift 6 actor isolation for thread safety.
     public var isReady: Bool {
         return state == .ready || state == .processing
     }
     
     /// Processing state enum
-/// Uses Swift 6 actor isolation for thread safety.
-    @available(macOS 15.0, *)
     public enum ProcessingState {
         case inactive
         case preparing
@@ -184,42 +152,30 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Performance metrics for monitoring
-/// Uses Swift 6 actor isolation for thread safety.
-    @available(macOS 15.0, *)
-    public struct PerformanceMetrics: Sendable {
+    public struct PerformanceMetrics {
         /// Neural Engine utilization (0-1)
-/// Uses Swift 6 actor isolation for thread safety.
         public var neuralEngineUtilization: Double = 0
         
         /// Average processing time per frame (ms)
-/// Uses Swift 6 actor isolation for thread safety.
         public var averageProcessingTime: Double = 0
         
         /// CPU usage for processing (0-1)
-/// Uses Swift 6 actor isolation for thread safety.
         public var cpuUsage: Double = 0
         
         /// Memory usage in MB
-/// Uses Swift 6 actor isolation for thread safety.
         public var memoryUsage: Double = 0
         
         /// Current frames processed per second
-/// Uses Swift 6 actor isolation for thread safety.
         public var framesPerSecond: Double = 0
         
         /// Timestamp of last update
-/// Uses Swift 6 actor isolation for thread safety.
         public var lastUpdateTime: Date = Date()
     }
     
     /// Initializes a new MLProcessor with the specified configuration
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - optimizationLevel: The optimization level to use
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - useNeuralEngine: Whether to use Neural Engine optimizations
-/// Uses Swift 6 actor isolation for thread safety.
     public init(
         optimizationLevel: OptimizationLevel = .balanced,
         useNeuralEngine: Bool = true
@@ -251,11 +207,8 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Prepares the ML model for processing
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter audioFormat: The audio format to use for processing
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: MLProcessorError if preparation fails
-/// Uses Swift 6 actor isolation for thread safety.
     public func prepareMLModel(with audioFormat: AVAudioFormat? = nil) async throws {
         // Update state to preparing
         await setProcessingState(.preparing)
@@ -323,11 +276,8 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Processes audio data through the ML pipeline
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter audioData: Raw audio sample data to process
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: MLProcessorError if processing fails
-/// Uses Swift 6 actor isolation for thread safety.
     public func processAudioData(_ audioData: [Float]) async throws {
         guard isReady else {
             throw MLProcessorError.modelNotLoaded
@@ -379,11 +329,8 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Processes a PCM buffer directly
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter buffer: The audio buffer to process
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: MLProcessorError if processing fails
-/// Uses Swift 6 actor isolation for thread safety.
     public func processAudioBuffer(_ buffer: AVAudioPCMBuffer) async throws {
         guard isReady else {
             throw MLProcessorError.modelNotLoaded
@@ -422,9 +369,7 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Starts continuous audio processing
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: MLProcessorError if starting fails
-/// Uses Swift 6 actor isolation for thread safety.
     public func startContinuousProcessing() throws {
         guard isReady else {
             throw MLProcessorError.modelNotLoaded
@@ -444,7 +389,6 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Stops continuous audio processing
-/// Uses Swift 6 actor isolation for thread safety.
     public func stopContinuousProcessing() {
         logger.info("Stopping continuous processing")
         
@@ -464,7 +408,6 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Cleanup resources
-/// Uses Swift 6 actor isolation for thread safety.
     public func cleanup() {
         logger.info("Cleaning up ML processor resources")
         
@@ -489,13 +432,10 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     // MARK: - Audio Data Consumer
     
     /// The subscription to audio data updates
-/// Uses Swift 6 actor isolation for thread safety.
     private var audioDataSubscription: AnyCancellable?
     
     /// Processes audio data from an AudioDataProvider
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter audioData: The audio data to process
-/// Uses Swift 6 actor isolation for thread safety.
     public func processAudioData(_ audioData: AudioData) {
         // Skip processing if we're not ready
         guard isReady else { return }
@@ -525,9 +465,7 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Subscribes to audio data from the specified provider
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter provider: The audio data provider
-/// Uses Swift 6 actor isolation for thread safety.
     public func subscribeToAudioData(from provider: AudioDataProvider) {
         logger.info("Subscribing to audio data from provider")
         
@@ -543,7 +481,6 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Unsubscribes from audio data
-/// Uses Swift 6 actor isolation for thread safety.
     public func unsubscribeFromAudioData() {
         logger.info("Unsubscribing from audio data")
         
@@ -554,7 +491,6 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     // MARK: - Neural Engine Configuration
     
     /// Configures the model for the current device
-/// Uses Swift 6 actor isolation for thread safety.
     private func configureModelForCurrentDevice() {
         logger.debug("Configuring model for current device")
         
@@ -579,9 +515,7 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     // MARK: - State Management
     
     /// Updates the processing state
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter newState: The new state
-/// Uses Swift 6 actor isolation for thread safety.
     @MainActor
     private func setProcessingState(_ newState: ProcessingState) {
         // Only update if state has changed
@@ -601,7 +535,6 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     // MARK: - Performance Monitoring
     
     /// Starts performance monitoring
-/// Uses Swift 6 actor isolation for thread safety.
     private func startPerformanceMonitoring() {
         logger.debug("Starting performance monitoring")
         
@@ -625,7 +558,6 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Updates processing time metrics
-/// Uses Swift 6 actor isolation for thread safety.
     private func updateProcessingTimeMetric() {
         // In a real implementation, this would track actual processing times
         // For demonstration, we'll use simulated values
@@ -637,7 +569,6 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     /// Updates all performance metrics
-/// Uses Swift 6 actor isolation for thread safety.
     private func updatePerformanceMetrics() {
         // Update memory usage (simulated)
         performanceMetrics.memoryUsage = Double.random(in: 50...150) // 50-150MB
@@ -649,7 +580,7 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
         performanceMetrics.lastUpdateTime = Date()
         
         // Notify delegate
-        Task { @MainActor in
+        DispatchQueue.main.async {
             self.delegate?.mlProcessorDidUpdateMetrics(self.performanceMetrics)
         }
     }
@@ -657,17 +588,11 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     // MARK: - Utilities
     
     /// Creates an audio PCM buffer from Float array data
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - data: The Float array audio data
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - format: The audio format to use
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: An AVAudioPCMBuffer containing the data
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: Error if buffer creation fails
-/// Uses Swift 6 actor isolation for thread safety.
     private func createPCMBuffer(from data: [Float], format: AVAudioFormat) throws -> AVAudioPCMBuffer {
         // Create buffer with appropriate capacity
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(data.count)) else {
@@ -689,9 +614,7 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     
     // MARK: - AudioFeatureExtractorDelegate
     /// Called when new audio features are extracted
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter features: The extracted audio features
-/// Uses Swift 6 actor isolation for thread safety.
     public func featureExtractor(_ extractor: AudioFeatureExtractor, didExtract features: AudioFeatures) {
         // Update our stored audio features
         Task { @MainActor in
@@ -731,9 +654,7 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
         }
     }
     /// Called when an error occurs during feature extraction
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter error: The error that occurred
-/// Uses Swift 6 actor isolation for thread safety.
     public func featureExtractor(_ extractor: AudioFeatureExtractor, didFailExtractingFeature featureType: AudioFeatureType, withError error: Error) {
         logger.error("Feature extraction error: \(error.localizedDescription)")
         
@@ -749,13 +670,9 @@ public actor MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     // MARK: - VisualizationDataReceiver
     
     /// Called when new visualization data is available
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - data: The visualization data
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - feature: The feature type
-/// Uses Swift 6 actor isolation for thread safety.
     public func didReceiveVisualizationData(_ data: VisualizationData, forFeature feature: AudioFeatureType) {
         // For most feature types, we'll just forward the data to subscribers
         if feature != .frequencySpectrum {

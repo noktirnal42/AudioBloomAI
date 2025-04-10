@@ -1,6 +1,3 @@
-// Swift 6 optimized implementation
-// Requires macOS 15.0 or later
-// Updated for modern concurrency
 import SwiftUI
 import AudioProcessor
 import MLEngine
@@ -8,8 +5,7 @@ import Visualizer
 import AudioBloomCore
 import Combine
 
-@available(macOS 15.0, *)
-struct ContentView: Sendable: View {
+struct ContentView: View {
     // Access environment objects
     @EnvironmentObject var audioEngine: AudioEngine
     @EnvironmentObject var audioBridge: AudioBridge
@@ -102,8 +98,7 @@ struct ContentView: Sendable: View {
 }
 
 /// Container for the Metal visualizer
-@available(macOS 15.0, *)
-struct VisualizerContainerView: Sendable: View {
+struct VisualizerContainerView: View {
     /// Reference to the Metal renderer
     @EnvironmentObject var renderer: MetalRenderer
     
@@ -124,8 +119,7 @@ struct VisualizerContainerView: Sendable: View {
 }
 
 /// Control panel for audio visualization
-@available(macOS 15.0, *)
-struct ControlPanelView: Sendable: View {
+struct ControlPanelView: View {
     /// Audio playback state
     @Binding var isPlaying: Bool
     
@@ -175,8 +169,7 @@ struct ControlPanelView: Sendable: View {
 }
 
 /// Settings panel view for adjusting visualization parameters
-@available(macOS 15.0, *)
-struct SettingsPanelView: Sendable: View {
+struct SettingsPanelView: View {
     /// Binding for visibility control
     @Binding var isVisible: Bool
     
@@ -236,8 +229,7 @@ struct SettingsPanelView: Sendable: View {
 }
 
 /// Audio level bar visualization component
-@available(macOS 15.0, *)
-struct AudioLevelBar: Sendable: View {
+struct AudioLevelBar: View {
     /// The current level (0-1)
     var level: CGFloat
     
@@ -261,8 +253,7 @@ struct AudioLevelBar: Sendable: View {
 }
 
 /// Audio levels visualization
-@available(macOS 15.0, *)
-struct AudioLevelsView: Sendable: View {
+struct AudioLevelsView: View {
     /// Reference to the audio engine
     @EnvironmentObject var audioEngine: AudioEngine
     

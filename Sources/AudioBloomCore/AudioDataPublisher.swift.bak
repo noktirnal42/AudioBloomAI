@@ -8,39 +8,31 @@ import Combine
 import Accelerate
 
 /// A publisher that emits audio data at regular intervals
-/// Uses Swift 6 actor isolation for thread safety.
-@available(macOS 15.0, *)
-public actor AudioDataPublisher {
-    // Converted to actor in Swift 6 for thread safety
+public class AudioDataPublisher {
     /// The subject that publishes audio data
-/// Uses Swift 6 actor isolation for thread safety.
     private let subject = PassthroughSubject<([Float], (left: Float, right: Float)), Never>()
     
     /// Lock for thread-safe publishing
-/// Uses Swift 6 actor isolation for thread safety.
-    // Lock removed - actor provides automatic isolation
+    private let lock = NSLock()
     
     /// Flag to track if the publisher has been canceled
-/// Uses Swift 6 actor isolation for thread safety.
     private var isCanceled = false
     
     /// Subscriber store to maintain references
-/// Uses Swift 6 actor isolation for thread safety.
     private var subscribers = Set<AnyCancellable>()
     
     /// Public initializer
-/// Uses Swift 6 actor isolation for thread safety.
     public init() {}
     
     /// The publisher that emits audio data
-/// Uses Swift 6 actor isolation for thread safety.
     public var publisher: AnyPublisher<([Float], (left: Float, right: Float)), Never> {
         subject.eraseToAnyPublisher()
     }
     
     /// Publishes new audio data in a thread-safe manner
-/// Uses Swift 6 actor isolation for thread safety.
-    public func publish(frequencyData: [Float], levels: (left: Float, right: Float)) { defer { }
+    public func publish(frequencyData: [Float], levels: (left: Float, right: Float)) {
+        lock.lock()
+        defer { lock.unlock() }
         
         guard !isCanceled else { return }
         
@@ -49,13 +41,12 @@ public actor AudioDataPublisher {
         let levelsCopy = levels
         
         // Send on the main thread to ensure UI compatibility
-        Task { @MainActor in [weak self] in
+        DispatchQueue.main.async { [weak self] in
             self?.subject.send((frequencyCopy, levelsCopy))
         }
     }
     
     /// Publishes raw audio data after performing FFT
-/// Uses Swift 6 actor isolation for thread safety.
     public func publishRawAudio(_ samples: [Float], sampleRate: Double) {
         guard !samples.isEmpty, !isCanceled else { return }
         
@@ -75,7 +66,6 @@ public actor AudioDataPublisher {
     }
     
     /// Calculate level from audio samples
-/// Uses Swift 6 actor isolation for thread safety.
     private func calculateLevel(from samples: [Float]) -> Float {
         var rms: Float = 0.0
         vDSP_measqv(samples, 1, &rms, vDSP_Length(samples.count))
@@ -83,7 +73,6 @@ public actor AudioDataPublisher {
     }
     
     /// Perform FFT on audio samples
-/// Uses Swift 6 actor isolation for thread safety.
     private func performFFT(samples: [Float]) -> [Float] {
         // Determine best FFT size (power of 2)
         let idealSize = 1024 // Default FFT size
@@ -142,7 +131,6 @@ public actor AudioDataPublisher {
     }
     
     /// Subscribe to another publisher and relay its data
-/// Uses Swift 6 actor isolation for thread safety.
     public func linkTo<P: Publisher>(publisher: P) where P.Output == ([Float], (left: Float, right: Float)), P.Failure == Never {
         publisher
             .sink { [weak self] frequencyData, levels in
@@ -152,28 +140,27 @@ public actor AudioDataPublisher {
     }
     
     /// Cancel publishing and cleanup
-/// Uses Swift 6 actor isolation for thread safety.
-    public func cancel() { isCanceled = true
-        subscribers.removeAll() }
+    public func cancel() {
+        lock.lock()
+        isCanceled = true
+        subscribers.removeAll()
+        lock.unlock()
+    }
     
     /// Cleanup when deallocated
-/// Uses Swift 6 actor isolation for thread safety.
     deinit {
         cancel()
     }
 }
 
 /// Extension for convenience methods
-/// Uses Swift 6 actor isolation for thread safety.
 public extension AudioDataPublisher {
     /// Forward data from one publisher to another
-/// Uses Swift 6 actor isolation for thread safety.
     static func forward(from source: AudioDataPublisher, to destination: AudioDataPublisher) {
         destination.linkTo(publisher: source.publisher)
     }
     
     /// Create a publisher with a timer that emits at regular intervals
-/// Uses Swift 6 actor isolation for thread safety.
     static func createTimedPublisher(interval: TimeInterval) -> AudioDataPublisher {
         let publisher = AudioDataPublisher()
         

@@ -14,7 +14,6 @@ import CoreML
 import os.log
 
 /// Errors that can occur during audio feature extraction
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
 public enum AudioFeatureExtractorError: Error, CustomStringConvertible, Sendable {
     // Core errors
@@ -73,56 +72,40 @@ public enum AudioFeatureExtractorError: Error, CustomStringConvertible, Sendable
 }
 
 /// Types of audio features that can be extracted
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
 public enum AudioFeatureType: String, CaseIterable, Identifiable, Sendable {
     /// Fast Fourier Transform magnitude
-/// Uses Swift 6 actor isolation for thread safety.
     case fftMagnitude = "FFT Magnitude"
     /// Mel Frequency Cepstral Coefficients
-/// Uses Swift 6 actor isolation for thread safety.
     case mfcc = "MFCC"
     /// Spectral centroid
-/// Uses Swift 6 actor isolation for thread safety.
     case spectralCentroid = "Spectral Centroid"
     /// Spectral flatness
-/// Uses Swift 6 actor isolation for thread safety.
     case spectralFlatness = "Spectral Flatness"
     /// Spectral rolloff
-/// Uses Swift 6 actor isolation for thread safety.
     case spectralRolloff = "Spectral Rolloff"
     /// Spectral flux
-/// Uses Swift 6 actor isolation for thread safety.
     case spectralFlux = "Spectral Flux"
     /// Zero crossing rate
-/// Uses Swift 6 actor isolation for thread safety.
     case zeroCrossingRate = "Zero Crossing Rate"
     /// Root mean square energy
-/// Uses Swift 6 actor isolation for thread safety.
     case rmsEnergy = "RMS Energy"
     /// Frequency band energy
-/// Uses Swift 6 actor isolation for thread safety.
     case frequencyBandEnergy = "Frequency Band Energy"
     /// Chroma features
-/// Uses Swift 6 actor isolation for thread safety.
     case chroma = "Chroma"
     /// Onset detection
-/// Uses Swift 6 actor isolation for thread safety.
     case onset = "Onset Detection"
     /// Beat detection
-/// Uses Swift 6 actor isolation for thread safety.
     case beat = "Beat Detection"
     /// Pitch detection
-/// Uses Swift 6 actor isolation for thread safety.
     case pitch = "Pitch Detection"
     /// Tempo estimation
-/// Uses Swift 6 actor isolation for thread safety.
     case tempo = "Tempo Estimation"
     
     public var id: String { self.rawValue }
     
     /// Get the feature dimension (output size)
-/// Uses Swift 6 actor isolation for thread safety.
     public func featureDimension(config: AudioFeatureExtractorConfiguration) -> Int {
         switch self {
         case .fftMagnitude:
@@ -145,7 +128,6 @@ public enum AudioFeatureType: String, CaseIterable, Identifiable, Sendable {
     }
     
     /// Check if this feature requires FFT computation
-/// Uses Swift 6 actor isolation for thread safety.
     public var requiresFFT: Bool {
         switch self {
         case .fftMagnitude, .mfcc, .spectralCentroid, .spectralFlatness, .spectralRolloff, .spectralFlux,
@@ -157,7 +139,6 @@ public enum AudioFeatureType: String, CaseIterable, Identifiable, Sendable {
     }
     
     /// Check if this feature requires temporal processing
-/// Uses Swift 6 actor isolation for thread safety.
     public var requiresTemporalProcessing: Bool {
         switch self {
         case .spectralFlux, .onset, .beat, .tempo:
@@ -169,76 +150,57 @@ public enum AudioFeatureType: String, CaseIterable, Identifiable, Sendable {
 }
 
 /// Audio feature configuration parameters
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
-public struct AudioFeatureExtractorConfiguration: Sendable: Sendable {
+public struct AudioFeatureExtractorConfiguration: Sendable {
     /// Sample rate in Hz
-/// Uses Swift 6 actor isolation for thread safety.
     public var sampleRate: Double
     
     /// FFT size (must be a power of 2)
-/// Uses Swift 6 actor isolation for thread safety.
     public var fftSize: Int
     
     /// Hop size (frame advance) in samples
-/// Uses Swift 6 actor isolation for thread safety.
     public var hopSize: Int
     
     /// Window type for FFT
-/// Uses Swift 6 actor isolation for thread safety.
     public var windowType: WindowType
     
     /// Number of MFCC coefficients to compute
-/// Uses Swift 6 actor isolation for thread safety.
     public var mfccCoefficients: Int
     
     /// Number of Mel filter banks
-/// Uses Swift 6 actor isolation for thread safety.
     public var melFilterBanks: Int
     
     /// Minimum frequency for analysis in Hz
-/// Uses Swift 6 actor isolation for thread safety.
     public var minFrequency: Float
     
     /// Maximum frequency for analysis in Hz
-/// Uses Swift 6 actor isolation for thread safety.
     public var maxFrequency: Float
     
     /// Frequency bands for band energy calculation
-/// Uses Swift 6 actor isolation for thread safety.
     public var frequencyBands: [(min: Float, max: Float)]
     
     /// Whether to use GPU acceleration
-/// Uses Swift 6 actor isolation for thread safety.
     public var useGPU: Bool
     
     /// Whether to use Neural Engine
-/// Uses Swift 6 actor isolation for thread safety.
     public var useNeuralEngine: Bool
     
     /// Window overlap percentage (0.0-1.0)
-/// Uses Swift 6 actor isolation for thread safety.
     public var windowOverlap: Float
     
     /// Number of history frames to keep for temporal features
-/// Uses Swift 6 actor isolation for thread safety.
     public var historyFrameCount: Int
     
     /// Whether to normalize output features
-/// Uses Swift 6 actor isolation for thread safety.
     public var normalizeFeatures: Bool
     
     /// Whether to use SoundAnalysis for advanced analysis
-/// Uses Swift 6 actor isolation for thread safety.
     public var useSoundAnalysis: Bool
     
     /// Path to CoreML model for advanced analysis
-/// Uses Swift 6 actor isolation for thread safety.
     public var coreMLModelPath: String?
     
     /// Window function types
-/// Uses Swift 6 actor isolation for thread safety.
-    @available(macOS 15.0, *)
     public enum WindowType: String, CaseIterable, Sendable {
         case hann
         case hamming
@@ -246,7 +208,6 @@ public struct AudioFeatureExtractorConfiguration: Sendable: Sendable {
         case rectangular
         
         /// Create a window function buffer of the specified size
-/// Uses Swift 6 actor isolation for thread safety.
         func createWindow(size: Int) -> [Float] {
             var window = [Float](repeating: 0, count: size)
             
@@ -269,11 +230,8 @@ public struct AudioFeatureExtractorConfiguration: Sendable: Sendable {
     }
     
     /// Create a default configuration
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter sampleRate: Sample rate in Hz
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Default configuration
-/// Uses Swift 6 actor isolation for thread safety.
     public static func defaultConfiguration(sampleRate: Double) -> AudioFeatureExtractorConfiguration {
         // Default frequency bands (in Hz): bass, low-mid, mid, high-mid, treble
         let bands: [(min: Float, max: Float)] = [
@@ -306,43 +264,30 @@ public struct AudioFeatureExtractorConfiguration: Sendable: Sendable {
 }
 
 /// Extracted audio features result
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
-public struct AudioFeatures: Sendable: Sendable {
+public struct AudioFeatures: Sendable {
     /// Source sample timestamps
-/// Uses Swift 6 actor isolation for thread safety.
     public let timestamp: TimeInterval
     
     /// Feature type
-/// Uses Swift 6 actor isolation for thread safety.
     public let featureType: AudioFeatureType
     
     /// Feature values
-/// Uses Swift 6 actor isolation for thread safety.
     public let values: [Float]
     
     /// Additional metadata
-/// Uses Swift 6 actor isolation for thread safety.
     public let metadata: [String: Any]
     
     /// Duration of the audio frame used for extraction
-/// Uses Swift 6 actor isolation for thread safety.
     public let frameDuration: TimeInterval
     
     /// Create a new feature result
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - timestamp: Source sample timestamps
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - featureType: Feature type
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - values: Feature values
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - metadata: Additional metadata
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - frameDuration: Duration of the audio frame used for extraction
-/// Uses Swift 6 actor isolation for thread safety.
     public init(
         timestamp: TimeInterval,
         featureType: AudioFeatureType,
@@ -359,276 +304,189 @@ public struct AudioFeatures: Sendable: Sendable {
 }
 
 /// Protocol for receiving audio feature extraction results
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
 public protocol AudioFeatureExtractorDelegate: AnyObject {
     /// Called when new features are extracted
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter features: Extracted features
-/// Uses Swift 6 actor isolation for thread safety.
     func featureExtractor(_ extractor: AudioFeatureExtractor, didExtract features: AudioFeatures)
     
     /// Called when a feature extraction error occurs
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - featureType: Feature type that caused the error
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - error: The error that occurred
-/// Uses Swift 6 actor isolation for thread safety.
     func featureExtractor(_ extractor: AudioFeatureExtractor, didFailExtractingFeature featureType: AudioFeatureType, withError error: Error)
 }
 
 /// Audio buffer identifier type
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
 public typealias AudioBufferID = UUID
 
 /// Protocol for audio pipeline integration
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
 public protocol AudioPipelineProtocol: AnyObject {
     /// Subscribe to audio data with the specified parameters
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - bufferSize: Size of buffers to receive
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - hopSize: Hop size between buffers
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - callback: Callback to receive buffer identifiers
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Subscription identifier
-/// Uses Swift 6 actor isolation for thread safety.
     func subscribe(bufferSize: Int, hopSize: Int, callback: @escaping (AudioBufferID, TimeInterval) -> Void) -> UUID
     
     /// Unsubscribe from audio data
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter subscriptionID: Subscription identifier to cancel
-/// Uses Swift 6 actor isolation for thread safety.
     func unsubscribe(_ subscriptionID: UUID)
     
     /// Unsubscribe all subscriptions for this client
-/// Uses Swift 6 actor isolation for thread safety.
     func unsubscribeAll()
     
     /// Get data from a buffer
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter bufferID: Buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Audio sample data, or nil if buffer is invalid
-/// Uses Swift 6 actor isolation for thread safety.
     func getBufferData(_ bufferID: AudioBufferID) -> [Float]?
     
     /// Release a buffer when done processing
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter bufferID: Buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     func releaseBuffer(_ bufferID: AudioBufferID)
     
     /// Get the current audio format
-/// Uses Swift 6 actor isolation for thread safety.
     var format: AVAudioFormat { get }
 }
 
 /// Metal compute core for GPU-accelerated processing
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
 public protocol MetalComputeProtocol: AnyObject {
     /// Create a Metal buffer
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - size: Buffer size in bytes
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - options: Resource options
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - label: Debug label
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     func createBuffer(size: Int, options: MTLResourceOptions, label: String) throws -> UInt64
     
     /// Create a buffer with initial data
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - data: Initial data
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - options: Resource options
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - label: Debug label
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     func createBufferWithData<T>(data: [T], options: MTLResourceOptions, label: String) throws -> UInt64
     
     /// Update buffer contents
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - bufferID: Buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - data: New data
-/// Uses Swift 6 actor isolation for thread safety.
     func updateBuffer<T>(_ bufferID: UInt64, data: [T]) throws
     
     /// Read data from a buffer
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - bufferID: Buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - count: Number of elements to read
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Buffer contents
-/// Uses Swift 6 actor isolation for thread safety.
     func readBuffer<T>(_ bufferID: UInt64, count: Int) throws -> [T]
     
     /// Release a buffer
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter bufferID: Buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     func releaseBuffer(_ bufferID: UInt64)
     
     /// Execute a Metal kernel function
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - name: Kernel function name
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - globalSize: Size of global execution grid
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - arguments: Kernel arguments
-/// Uses Swift 6 actor isolation for thread safety.
     func executeKernel(name: String, globalSize: [Int], arguments: [Any]) throws
     
     /// Execute FFT operation
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - inputBuffer: Input buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - outputBuffer: Output buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - magnitudeBuffer: Magnitude buffer identifier
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - size: FFT size
-/// Uses Swift 6 actor isolation for thread safety.
     func executeFFT(inputBuffer: UInt64, outputBuffer: UInt64, magnitudeBuffer: UInt64, size: Int) throws
 }
 
 /// Unified audio feature extractor implementation
-/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
-public final actor AudioFeatureExtractor: @unchecked Sendable  {
-    // Converted to actor in Swift 6 for thread safety
+public final class AudioFeatureExtractor: @unchecked Sendable {
     // MARK: - Properties
     
     /// Logger instance for detailed logging
-/// Uses Swift 6 actor isolation for thread safety.
     private let logger = Logger(subsystem: "com.audiobloom.core", category: "feature-extractor")
     
     /// OS logger for system integration
-/// Uses Swift 6 actor isolation for thread safety.
     private let osLogger = os.Logger(subsystem: "com.audiobloom.core", category: "feature-extractor")
     
     /// Configuration parameters
-/// Uses Swift 6 actor isolation for thread safety.
     public private(set) var config: AudioFeatureExtractorConfiguration
     
     /// Audio pipeline for processing
-/// Uses Swift 6 actor isolation for thread safety.
     private let audioPipeline: AudioPipelineProtocol
     
     /// Metal compute core for GPU acceleration
-/// Uses Swift 6 actor isolation for thread safety.
     private let metalCore: MetalComputeProtocol?
     
     /// Delegate for receiving extraction results
-/// Uses Swift 6 actor isolation for thread safety.
     public weak var delegate: AudioFeatureExtractorDelegate?
     
     /// Feature types to extract
-/// Uses Swift 6 actor isolation for thread safety.
     public private(set) var activeFeatures: Set<AudioFeatureType> = []
     
     /// Current audio format
-/// Uses Swift 6 actor isolation for thread safety.
     private var audioFormat: AVAudioFormat
     
     /// Window function buffer
-/// Uses Swift 6 actor isolation for thread safety.
     private var window: [Float]
     
     /// Previous frame buffer for temporal processing
-/// Uses Swift 6 actor isolation for thread safety.
     private var previousFrames: [AudioFeatureType: [[Float]]] = [:]
     
     /// FFT buffer (reused for memory efficiency)
-/// Uses Swift 6 actor isolation for thread safety.
     private var fftBuffer: [Float]
     
     /// Feature history buffer for temporal features
-/// Uses Swift 6 actor isolation for thread safety.
     private var featureHistory: [AudioFeatureType: RingBuffer<[Float]>] = [:]
     
     /// Mel filter bank weights
-/// Uses Swift 6 actor isolation for thread safety.
     private var melFilterBank: [[Float]] = []
     
     /// DCT matrix for MFCC computation
-/// Uses Swift 6 actor isolation for thread safety.
     private var dctMatrix: [[Float]] = []
     
     /// GPU buffers for frequency domain processing
-/// Uses Swift 6 actor isolation for thread safety.
     private var gpuBuffers: [String: UInt64] = [:]
     
     /// Whether the extractor is running
-/// Uses Swift 6 actor isolation for thread safety.
     public private(set) var isRunning = false
     
     /// Audio subscription identifier
-/// Uses Swift 6 actor isolation for thread safety.
     private var audioSubscriptionID: UUID?
     
     /// Queue for buffer management and extraction
-/// Uses Swift 6 actor isolation for thread safety.
     private let extractionQueue = DispatchQueue(label: "com.audiobloom.feature-extraction", qos: .userInteractive)
     
     /// Currently processing audio buffer IDs
-/// Uses Swift 6 actor isolation for thread safety.
     private var processingBuffers: Set<AudioBufferID> = []
     
     /// Sound analysis engine for advanced analysis
-/// Uses Swift 6 actor isolation for thread safety.
     private var audioAnalyzer: SNAudioStreamAnalyzer?
     
     /// Neural Engine optimized ML model for audio analysis
-/// Uses Swift 6 actor isolation for thread safety.
     private var audioAnalysisModel: MLModel?
     
     /// Frequency data publisher for real-time updates
-/// Uses Swift 6 actor isolation for thread safety.
     private let frequencySubject = PassthroughSubject<[Float], Never>()
     
     /// Lock for thread safety
-/// Uses Swift 6 actor isolation for thread safety.
-    // Lock removed - actor provides automatic isolation
+    private let lock = NSLock()
     
     /// Publisher for frequency data
-/// Uses Swift 6 actor isolation for thread safety.
     public var frequencyPublisher: AnyPublisher<[Float], Never> {
         frequencySubject.eraseToAnyPublisher()
     }
     
     /// Subject for publishing beat detection events
-/// Uses Swift 6 actor isolation for thread safety.
     private let beatSubject = PassthroughSubject<(confidence: Float, timestamp: TimeInterval), Never>()
     
     /// Publisher for beat detection events
-/// Uses Swift 6 actor isolation for thread safety.
     public var beatPublisher: AnyPublisher<(confidence: Float, timestamp: TimeInterval), Never> {
         beatSubject.eraseToAnyPublisher()
     }
@@ -636,15 +494,10 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     // MARK: - Lifecycle
     
     /// Initialize the feature extractor
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - audioPipeline: Audio pipeline for processing
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - config: Configuration parameters (optional)
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - metalCore: Metal compute engine for GPU acceleration (optional)
-/// Uses Swift 6 actor isolation for thread safety.
     public init(
         audioPipeline: AudioPipelineProtocol,
         config: AudioFeatureExtractorConfiguration? = nil,
@@ -705,9 +558,7 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     // MARK: - Configuration
     
     /// Configure the feature extractor
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter config: New configuration
-/// Uses Swift 6 actor isolation for thread safety.
     public func configure(with config: AudioFeatureExtractorConfiguration) throws {
         // Ensure we're not running
         guard config.useNeuralEngine else { return }
@@ -738,7 +589,6 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     // MARK: - GPU Buffer Management
     
     /// Allocate GPU buffers for feature extraction
-/// Uses Swift 6 actor isolation for thread safety.
     private func allocateGPUBuffers() throws {
         guard let metalCore = metalCore else { return }
         
@@ -817,7 +667,6 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     }
     
     /// Release GPU buffers
-/// Uses Swift 6 actor isolation for thread safety.
     private func releaseGPUBuffers() {
         guard let metalCore = metalCore else { return }
         
@@ -832,7 +681,6 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     // MARK: - Filter Bank Setup
     
     /// Setup Mel filter banks for MFCC computation
-/// Uses Swift 6 actor isolation for thread safety.
     private func setupMelFilterBanks() {
         let fftBins = config.fftSize / 2 + 1
         let minMel = frequencyToMel(config.minFrequency)
@@ -876,7 +724,6 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     }
     
     /// Setup DCT matrix for MFCC computation
-/// Uses Swift 6 actor isolation for thread safety.
     private func setupDCTMatrix() {
         let M = config.melFilterBanks
         let N = config.mfccCoefficients
@@ -892,13 +739,11 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     }
     
     /// Convert frequency to Mel scale
-/// Uses Swift 6 actor isolation for thread safety.
     private func frequencyToMel(_ frequency: Float) -> Float {
         return 2595 * log10(1 + frequency / 700)
     }
     
     /// Convert Mel scale to frequency
-/// Uses Swift 6 actor isolation for thread safety.
     private func melToFrequency(_ mel: Float) -> Float {
         return 700 * (pow(10, mel / 2595) - 1)
     }
@@ -906,7 +751,6 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     // MARK: - Feature Extraction Control
     
     /// Start feature extraction
-/// Uses Swift 6 actor isolation for thread safety.
     public func start() throws {
         guard !isRunning else { return }
         
@@ -935,36 +779,46 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
         // Store subscription
         self.audioSubscriptionID = subscription
         
-        // Update state isRunning = true osLogger.info("Feature extraction started with \(activeFeatures.count) active features")
+        // Update state
+        lock.lock()
+        isRunning = true
+        lock.unlock()
+        
+        osLogger.info("Feature extraction started with \(activeFeatures.count) active features")
     }
     
     /// Stop feature extraction
-/// Uses Swift 6 actor isolation for thread safety.
     public func stop() {
         guard isRunning else { return }
         
-        // Update state first to prevent new processing isRunning = false // Unsubscribe from audio pipeline
+        // Update state first to prevent new processing
+        lock.lock()
+        isRunning = false
+        lock.unlock()
+        
+        // Unsubscribe from audio pipeline
         if let subscriptionID = audioSubscriptionID {
             audioPipeline.unsubscribe(subscriptionID)
             audioSubscriptionID = nil
         }
         
-        // Clean up any remaining buffers for bufferID in processingBuffers {
+        // Clean up any remaining buffers
+        lock.lock()
+        for bufferID in processingBuffers {
             audioPipeline.releaseBuffer(bufferID)
         }
-        processingBuffers.removeAll() osLogger.info("Feature extraction stopped")
+        processingBuffers.removeAll()
+        lock.unlock()
+        
+        osLogger.info("Feature extraction stopped")
     }
     
     // MARK: - Audio Processing
     
     /// Process an audio buffer
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - buffer: Audio buffer
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - timestamp: Buffer timestamp
-/// Uses Swift 6 actor isolation for thread safety.
     private func processAudioBuffer(_ buffer: AudioBufferID, timestamp: TimeInterval) {
         // Check if we're still running
         guard isRunning else {
@@ -972,8 +826,17 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
             return
         }
         
-        // Track this buffer as being processed processingBuffers.insert(buffer) // Get audio data from buffer
-        guard let samples = audioPipeline.getBufferData(buffer) else { processingBuffers.remove(buffer) osLogger.warning("Failed to get data from buffer \(buffer)")
+        // Track this buffer as being processed
+        lock.lock()
+        processingBuffers.insert(buffer)
+        lock.unlock()
+        
+        // Get audio data from buffer
+        guard let samples = audioPipeline.getBufferData(buffer) else {
+            lock.lock()
+            processingBuffers.remove(buffer)
+            lock.unlock()
+            osLogger.warning("Failed to get data from buffer \(buffer)")
             return
         }
         
@@ -1008,14 +871,15 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
         #endif
         
         // Release the buffer
-        audioPipeline.releaseBuffer(buffer) processingBuffers.remove(buffer) }
+        audioPipeline.releaseBuffer(buffer)
+        lock.lock()
+        processingBuffers.remove(buffer)
+        lock.unlock()
+    }
     
     /// Create an AVAudioPCMBuffer from samples
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter samples: Sample data
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: PCM buffer, or nil if creation fails
-/// Uses Swift 6 actor isolation for thread safety.
     private func createPCMBuffer(from samples: [Float]) -> AVAudioPCMBuffer? {
         let frameCount = AVAudioFrameCount(samples.count)
         guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFormat, frameCapacity: frameCount) else {
@@ -1036,13 +900,9 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     }
     
     /// Extract features from audio samples
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - samples: Audio samples
-/// Uses Swift 6 actor isolation for thread safety.
     ///   - timestamp: Buffer timestamp
-/// Uses Swift 6 actor isolation for thread safety.
     private func extractFeaturesFromSamples(_ samples: [Float], timestamp: TimeInterval) throws {
         // Ensure we have enough samples
         guard samples.count == config.fftSize else {
@@ -1111,9 +971,7 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     }
     
     /// Set active features for extraction
-/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter features: Set of features to extract
-/// Uses Swift 6 actor isolation for thread safety.
     public func setActiveFeatures(_ features: Set<AudioFeatureType>) throws {
         // Ensure we're not running
         guard !isRunning else {
@@ -1131,8 +989,9 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     }
     
     /// Reset history buffers
-/// Uses Swift 6 actor isolation for thread safety.
-    private func resetHistory() { defer { }
+    private func resetHistory() {
+        lock.lock()
+        defer { lock.unlock() }
         
         // Clear previous frames
         previousFrames.removeAll()
@@ -1150,7 +1009,6 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     // MARK: - Neural Engine and SoundAnalysis Setup
     
     /// Set up SoundAnalysis components
-/// Uses Swift 6 actor isolation for thread safety.
     private func setupSoundAnalysis() {
         guard config.useSoundAnalysis else { return }
         
@@ -1187,7 +1045,6 @@ public final actor AudioFeatureExtractor: @unchecked Sendable  {
     }
     
     /// Set up Neural Engine model
-/// Uses Swift 6 actor isolation for thread safety.
     private func setupNeuralEngine() {
         guard config.useNeuralEngine else { return }
         

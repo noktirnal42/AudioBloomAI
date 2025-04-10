@@ -1,6 +1,3 @@
-// Swift 6 optimized implementation
-// Requires macOS 15.0 or later
-// Updated for modern concurrency
 //
 // PerformanceTracker.swift
 // Performance tracking for AudioBridge
@@ -10,7 +7,6 @@ import Foundation
 import QuartzCore
 
 /// Performance tracking for audio processing
-@available(macOS 15.0, *)
 class PerformanceTracker: Sendable {
     /// Number of frames processed
     private var frameCount: Int = 0
