@@ -399,4 +399,3 @@ final class AudioPipelineProcessingTests: AudioPipelineBaseTests {
         }
     }
 }
-

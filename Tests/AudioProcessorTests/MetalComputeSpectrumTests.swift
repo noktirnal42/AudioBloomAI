@@ -271,5 +271,3 @@ final class MetalComputeSpectrumTests: MetalComputeBaseTests {
         }
     }
 }
-
-

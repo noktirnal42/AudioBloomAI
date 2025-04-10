@@ -666,4 +666,3 @@ final class MetalComputeCoreTests: XCTestCase {
     }
 
     // MARK: -
-

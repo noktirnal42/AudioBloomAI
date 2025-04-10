@@ -384,4 +384,3 @@ final class AudioPipelinePerformanceTests: AudioPipelineBaseTests {
         }
     }
 }
-

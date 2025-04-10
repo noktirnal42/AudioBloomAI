@@ -142,5 +142,3 @@ class AudioPipelineBaseTests: XCTestCase {
         return sqrt(sumSquares / Float(buffer.count))
     }
 }
-
-

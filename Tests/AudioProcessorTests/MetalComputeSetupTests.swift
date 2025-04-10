@@ -153,4 +153,3 @@ final class MetalComputeSetupTests: MetalComputeBaseTests {
         ))
     }
 }
-

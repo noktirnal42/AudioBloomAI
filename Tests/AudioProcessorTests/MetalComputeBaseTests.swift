@@ -144,5 +144,3 @@ class MetalComputeBaseTests: XCTestCase {
         return result
     }
 }
-
-
