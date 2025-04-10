@@ -119,28 +119,44 @@ public enum AudioBloomCore {
 }
 
 // MARK: - Audio Data Structures
-
 /// Audio data structure representing an audio buffer and its properties
-public struct AudioData {
+public struct AudioData: Sendable {
     /// The audio samples
     public let samples: [Float]
+    
     /// Audio levels (left and right channels)
     public let levels: (left: Float, right: Float)
+    
     /// Sample rate of the audio
     public let sampleRate: Double
+    
     /// Timestamp when the audio was captured
     public let timestamp: Date
+    
+    /// Frequency spectrum data (if available)
+    public var frequencyData: [Float] = []
     
     public init(
         samples: [Float],
         levels: (left: Float, right: Float),
         sampleRate: Double,
-        timestamp: Date = Date()
+        timestamp: Date = Date(),
+        frequencyData: [Float] = []
     ) {
         self.samples = samples
         self.levels = levels
         self.sampleRate = sampleRate
         self.timestamp = timestamp
+        self.frequencyData = frequencyData
+    }
+    
+    /// Initializes with just frequency data (for compatibility)
+    public init(frequencyData: [Float], levels: (left: Float, right: Float), timestamp: Date = Date()) {
+        self.samples = []
+        self.levels = levels
+        self.sampleRate = AudioBloomCore.Constants.defaultSampleRate
+        self.timestamp = timestamp
+        self.frequencyData = frequencyData
     }
 }
 
@@ -169,9 +185,8 @@ public struct AudioConfiguration {
 }
 
 // MARK: - Core Protocols
-
 /// Protocol for objects that provide audio data
-public protocol AudioDataProvider: AnyObject {
+public protocol AudioDataProvider: AnyObject, Sendable {
     /// Publisher for audio data updates
     var audioDataPublisher: AnyPublisher<AudioData, Never> { get }
     
@@ -198,6 +213,18 @@ public protocol AudioDataProvider: AnyObject {
     
     /// Lists available audio devices
     func availableDevices() -> (input: [(id: String, name: String)], output: [(id: String, name: String)])
+}
+
+/// Protocol for audio data publishers with simplified requirements
+public protocol AudioDataPublisher: AnyObject {
+    /// Publisher for audio data
+    var publisher: AnyPublisher<AudioData, Never> { get }
+    
+    /// Publishes new audio data
+    /// - Parameters:
+    ///   - frequencyData: The frequency spectrum data
+    ///   - levels: The audio level data
+    func publish(frequencyData: [Float], levels: (Float, Float))
 }
 
 /// Protocol for audio processing modules
@@ -258,16 +285,23 @@ public protocol MLProcessing: ObservableObject {
     /// Cleanup ML resources
     func cleanup()
 }
-
 /// Protocol for ML processing integration
-public protocol MLProcessorProtocol: AnyObject {
+public protocol MLProcessorProtocol: AnyObject, Sendable {
+    /// Whether the processor is ready for processing
+    var isReady: Bool { get }
+    
     /// Process audio data for ML analysis
     /// - Parameter audioData: The audio data to analyze
     /// - Returns: Analysis results
     func processAudio(_ audioData: AudioData) throws -> [String: Any]
     
+    /// Processes raw audio data
+    /// - Parameter audioData: The raw audio data to process
+    /// - Throws: Error if processing fails
+    func processAudioData(_ audioData: [Float]) async throws
+    
     /// Publisher for visualization data
-    var visualizationDataPublisher: AnyPublisher<[Float], Never> { get }
+    var visualizationDataPublisher: AnyPublisher<VisualizationData, Never> { get }
 }
 
 // MARK: - Utility Type Aliases

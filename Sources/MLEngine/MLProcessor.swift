@@ -2,11 +2,11 @@ import Foundation
 import CoreML
 import Combine
 import AudioBloomCore
+import AudioBloomCore.Audio
 import AVFoundation
 import SoundAnalysis
 import Logging
 import os.signpost
-
 /// Errors that can occur during ML processing
 public enum MLProcessorError: Error {
     case featureExtractionFailed(Error)
@@ -47,6 +47,28 @@ public protocol MLProcessingDelegate: AnyObject {
 }
 
 /// ML Processor for analyzing audio data and generating visual effects
+
+// Dummy implementation of AudioPipelineProtocol for backward compatibility
+fileprivate class DummyAudioPipeline: AudioPipelineProtocol {
+    func subscribe(bufferSize: Int, hopSize: Int, callback: @escaping (AudioBufferID, TimeInterval) -> Void) -> UUID {
+        return UUID()
+    }
+    
+    func unsubscribe(_ subscriptionID: UUID) {}
+    
+    func unsubscribeAll() {}
+    
+    func getBufferData(_ bufferID: AudioBufferID) -> [Float]? {
+        return nil
+    }
+    
+    func releaseBuffer(_ bufferID: AudioBufferID) {}
+    
+    var format: AVAudioFormat {
+        return AVAudioFormat(standardFormatWithSampleRate: 44100, channels: 1)!
+    }
+}
+
 public class MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, VisualizationDataReceiver, AudioDataConsumer {
     /// Published ML model output data for visualization
     @Published public private(set) var outputData: [Float] = []
@@ -162,10 +184,13 @@ public class MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
         self.useNeuralEngine = useNeuralEngine
         
         // Initialize the components
-        self.featureExtractor = AudioFeatureExtractor()
+        // Using default implementation since proper initialization would require AudioPipelineProtocol
+        self.featureExtractor = AudioFeatureExtractor(
+            audioPipeline: DummyAudioPipeline(),
+            config: AudioFeatureExtractorConfiguration.defaultConfiguration(sampleRate: 44100)
+        )
         self.modelConfig = ModelConfiguration(optimizationLevel: optimizationLevel)
         self.outputTransformer = OutputTransformer(configuration: .defaultConfiguration())
-        
         // Complete initialization
         super.init()
         
@@ -588,10 +613,9 @@ public class MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
     }
     
     // MARK: - AudioFeatureExtractorDelegate
-    
     /// Called when new audio features are extracted
     /// - Parameter features: The extracted audio features
-    public func didExtractFeatures(_ features: AudioFeatures) {
+    public func featureExtractor(_ extractor: AudioFeatureExtractor, didExtract features: AudioFeatures) {
         // Update our stored audio features
         Task { @MainActor in
             self.audioFeatures = features
@@ -629,10 +653,9 @@ public class MLProcessor: ObservableObject, AudioFeatureExtractorDelegate, Visua
             }
         }
     }
-    
     /// Called when an error occurs during feature extraction
     /// - Parameter error: The error that occurred
-    public func didEncounterError(_ error: AudioFeatureExtractorError) {
+    public func featureExtractor(_ extractor: AudioFeatureExtractor, didFailExtractingFeature featureType: AudioFeatureType, withError error: Error) {
         logger.error("Feature extraction error: \(error.localizedDescription)")
         
         // Update state to error
