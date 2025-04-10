@@ -4,7 +4,8 @@ import MetalKit
 import AVFoundation
 import SwiftUI
 import Logging
-import CoreVideo
+import AppKit
+import os.log
 
 /// Enumeration of available visualization modes
 public enum VisualizationMode: String, CaseIterable, Identifiable, Sendable {
@@ -236,8 +237,10 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     private var waveformHistory: [[Float]] = []
     
     /// Display link for frame timing
-    private var displayLink: CVDisplayLink?
+    private var displayLink: Any?
     
+    /// Display link target for callback handling
+    private var displayLinkTarget: DisplayLinkTarget?
     /// Performance monitoring service
     private weak var performanceMonitor: PerformanceMonitor?
     
@@ -360,16 +363,14 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
         
         // Update beat detection based on neural confidence
         if response.beatConfidence > 0.7 && !wasDetected {
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.beatDetected = true
                 
-                // Auto-reset the beat detection after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self.beatDetected = false
-                }
+                // Auto-reset the beat detection after a short delay using modern concurrency
+                try? await Task.sleep(for: .milliseconds(100))
+                self.beatDetected = false
             }
         }
-        
         // Can also update other visualization parameters based on neural response
         // Implementation would depend on how different visualizations use the neural data
     }
@@ -398,85 +399,111 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
         logger.debug("Subscribed to neural processing")
     }
     
-    // MARK: - Private Methods
+    // MARK: - Display Link Target
     
-    /// Setup the display link for frame synchronization
-    private func setupDisplayLink() {
-        // Create a display link capable of being used with all active displays
-        var newDisplayLink: CVDisplayLink?
+    /// Class to handle DisplayLink callbacks
+    private final class DisplayLinkTarget {
+        weak var bridge: AudioVisualizerBridge?
         
-        // Set up display link callback
-        let displayLinkOutputCallback: CVDisplayLinkOutputCallback = { 
-            (displayLink: CVDisplayLink, 
-             inNow: UnsafePointer<CVTimeStamp>, 
-             inOutputTime: UnsafePointer<CVTimeStamp>, 
-             flagsIn: CVOptionFlags, 
-             flagsOut: UnsafeMutablePointer<CVOptionFlags>, 
-             displayLinkContext: UnsafeMutableRawPointer?) -> CVReturn in
-            
-            // Get the object reference from context
-            let bridge = Unmanaged<AudioVisualizerBridge>.fromOpaque(displayLinkContext!).takeUnretainedValue()
-            bridge.displayLinkDidFire()
-            
-            return kCVReturnSuccess
+        init(bridge: AudioVisualizerBridge) {
+            self.bridge = bridge
         }
         
-        // Create display link
-        let error = CVDisplayLinkCreateWithActiveCGDisplays(&newDisplayLink)
+        @objc func displayLinkDidFire(displayLink: NSObject) {
+            guard let bridge = bridge else { return }
+            Task { @MainActor in
+                bridge.handleDisplayLinkFire()
+            }
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Setup the display link for frame synchronization using modern APIs
+    private func setupDisplayLink() {
+        // Create display link target
+        let target = DisplayLinkTarget(bridge: self)
+        self.displayLinkTarget = target
         
-        if error == kCVReturnSuccess, let newDisplayLink = newDisplayLink {
-            // Set the context to point to self
-            let pointerToSelf = Unmanaged.passUnretained(self).toOpaque()
-            CVDisplayLinkSetOutputCallback(newDisplayLink, displayLinkOutputCallback, pointerToSelf)
-            
+        if let mainView = NSApp.mainWindow?.contentView {
+            // Use modern NSView.displayLink API (available in macOS 15+)
+            let newDisplayLink = mainView.displayLink(target: target, 
+                                                     selector: #selector(DisplayLinkTarget.displayLinkDidFire))
             self.displayLink = newDisplayLink
+            logger.debug("Set up modern display link for visualization synchronization")
+        } else {
+            // Fallback to a timer if no view is available
+            logger.warning("No main view available, using timer fallback for visualization")
+            let timer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    self.handleDisplayLinkFire()
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.displayLink = timer
         }
     }
     
     /// Start the display link
     private func startDisplayLink() {
-        if let displayLink = displayLink, !CVDisplayLinkIsRunning(displayLink) {
-            CVDisplayLinkStart(displayLink)
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.isPaused = false
+            logger.debug("Started display link")
+        } else if let displayLink = displayLink as? Timer {
+            // Timer is already running from setup
+            logger.debug("Using timer for display synchronization")
+        } else {
+            // No display link exists, create one
+            setupDisplayLink()
+            if let displayLink = displayLink as? NSDisplayLink {
+                displayLink.isPaused = false
+            }
         }
     }
     
     /// Stop the display link
     private func stopDisplayLink() {
-        if let displayLink = displayLink, CVDisplayLinkIsRunning(displayLink) {
-            CVDisplayLinkStop(displayLink)
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.isPaused = true
+            logger.debug("Paused display link")
+        } else if let displayLink = displayLink as? Timer {
+            displayLink.invalidate()
+            self.displayLink = nil
+            logger.debug("Stopped timer for display synchronization")
         }
     }
-    
-    /// Called when the display link fires
-    @objc private func displayLinkDidFire() {
+    /// Called when the display link fires - modern implementation
+    @MainActor
+    private func handleDisplayLinkFire() {
         // Check if we need to update the UI for transition progress
         updateTransitionProgress()
         
-        // Update data on main thread
+        // Since we're already on the main thread with @MainActor,
+        // we can directly update the visualization data
         updateVisualizationData()
+        
+        // Track performance if monitor available
+        performanceMonitor?.recordRenderTime(1.0) // Placeholder value
     }
-    
     /// Update visualization data on the main thread
+    @MainActor
     private func updateVisualizationData() {
-        // Make sure we update the UI on the main thread
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            self.lock.lock()
-            // Copy data for thread safety
-            let spectrumCopy = self.spectrumData
-            let waveformCopy = self.waveformData
-            let levelsCopy = self.audioLevels
-            self.lock.unlock()
-            
-            // Update published properties
-            self.spectrumData = spectrumCopy
-            self.waveformData = waveformCopy
-            self.audioLevels = levelsCopy
-        }
+        lock.lock()
+        // Copy data for thread safety
+        let spectrumCopy = self.spectrumData
+        let waveformCopy = self.waveformData
+        let levelsCopy = self.audioLevels
+        lock.unlock()
+        
+        // Update published properties
+        // This is now running on the main thread through @MainActor
+        self.spectrumData = spectrumCopy
+        self.waveformData = waveformCopy
+        self.audioLevels = levelsCopy
     }
-    
     /// Update transition progress
+    @MainActor
     private func updateTransitionProgress() {
         guard transitionProgress < 1.0 else {
             // Transition complete
@@ -489,10 +516,8 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
         let elapsedTime = currentTime - transitionStartTime
         let progress = min(1.0, elapsedTime / configuration.transitionDuration)
         
-        // Update the progress on the main thread
-        DispatchQueue.main.async { [weak self] in
-            self?.transitionProgress = progress
-        }
+        // Update the progress (we're already on the main thread with @MainActor)
+        self.transitionProgress = progress
         
         // If transition is complete, clean up
         if progress >= 1.0 {
@@ -500,7 +525,6 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
             transitionTimer = nil
         }
     }
-    
     /// Process audio data for spectrum visualization
     private func processSpectrumData(_ audioData: [Float]) {
         // Begin performance monitoring

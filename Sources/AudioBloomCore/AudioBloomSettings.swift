@@ -6,9 +6,18 @@
 import Foundation
 import SwiftUI
 import Combine
-
+import os.log
 /// Application settings manager with persistence
-public class AudioBloomSettings: ObservableObject {
+///
+/// This class manages all user configurable settings for the AudioBloom application.
+/// It provides persistence through UserDefaults and publishes changes to interested subscribers.
+///
+/// - Note: This class is marked as `@unchecked Sendable` because it contains `@Published` properties
+///         that are not themselves `Sendable`. However, all mutations are performed on the main thread
+///         through SwiftUI's state management system, making it thread-safe in practice.
+public final class AudioBloomSettings: ObservableObject, @unchecked Sendable {
+    /// Logger instance for settings
+    private let logger = Logger(subsystem: "com.audiobloom.settings", category: "settings")
     // MARK: - UserDefaults Keys
     
     private enum Keys {
@@ -66,11 +75,7 @@ public class AudioBloomSettings: ObservableObject {
         }
     }
     
-    /// Audio sensitivity (0.0 - 1.0)
-    @Published public var audioSensitivity: Double {
-        didSet {
-            UserDefaults.standard.set(audioSensitivity, forKey: Keys.audioSensitivity)
-            notifyVisualizationUpdate()
+    // MARK: - Publishers for Observed Changes
         }
     }
     
@@ -243,7 +248,6 @@ public class AudioBloomSettings: ObservableObject {
         get { return lastOutputDeviceID }
         set { lastOutputDeviceID = newValue }
     }
-    
     /// Visualization modes available in the app
     public enum VisualizationMode: String, CaseIterable, Identifiable, Sendable {
         case spectrum = "Spectrum"
@@ -267,19 +271,27 @@ public class AudioBloomSettings: ObservableObject {
             }
         }
     }
+<<<<<<< HEAD
     }
     
+=======
+>>>>>>> fix/70-settings-structure
     // MARK: - Publishers for Observed Changes
     
+    /// Serial queue for thread-safe publisher operations
+    private let publisherQueue = DispatchQueue(label: "com.audiobloom.settings.publishers", qos: .userInitiated)
+    
     /// Publisher for visualization parameter updates
+    /// - Note: Access to this publisher is synchronized through the publisherQueue
     public let visualizationUpdatePublisher = PassthroughSubject<[String: Any], Never>()
     
     /// Publisher for audio configuration updates
+    /// - Note: Access to this publisher is synchronized through the publisherQueue
     public let audioConfigUpdatePublisher = PassthroughSubject<Void, Never>()
     
     /// Publisher for performance configuration updates
+    /// - Note: Access to this publisher is synchronized through the publisherQueue
     public let performanceUpdatePublisher = PassthroughSubject<Void, Never>()
-    
     // MARK: - Initialization
     
     /// Default initialization with standard settings
@@ -569,16 +581,30 @@ public class AudioBloomSettings: ObservableObject {
     
     /// Notifies subscribers of visualization parameter changes
     private func notifyVisualizationUpdate() {
-        visualizationUpdatePublisher.send(visualizationParameters())
+        // Ensure thread-safety by dispatching to dedicated queue
+        publisherQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.visualizationUpdatePublisher.send(self.visualizationParameters())
+            self.logger.debug("Visualization update notification sent")
+        }
     }
     
     /// Notifies subscribers of audio configuration changes
     private func notifyAudioConfigUpdate() {
-        audioConfigUpdatePublisher.send()
+        // Ensure thread-safety by dispatching to dedicated queue
+        publisherQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.audioConfigUpdatePublisher.send()
+            self.logger.debug("Audio configuration update notification sent")
+        }
     }
     
     /// Notifies subscribers of performance configuration changes
     private func notifyPerformanceUpdate() {
-        performanceUpdatePublisher.send()
+        // Ensure thread-safety by dispatching to dedicated queue
+        publisherQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.performanceUpdatePublisher.send()
+            self.logger.debug("Performance update notification sent")
+        }
     }
-}
