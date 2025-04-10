@@ -245,7 +245,7 @@ public class AudioBloomSettings: ObservableObject {
     }
     
     /// Visualization modes available in the app
-    public enum VisualizationMode: String, CaseIterable, Identifiable {
+    public enum VisualizationMode: String, CaseIterable, Identifiable, Sendable {
         case spectrum = "Spectrum"
         case waveform = "Waveform"
         case particles = "Particles"
@@ -266,6 +266,7 @@ public class AudioBloomSettings: ObservableObject {
                 return "Neural network-driven visualization"
             }
         }
+    }
     }
     
     // MARK: - Publishers for Observed Changes
@@ -307,7 +308,7 @@ public class AudioBloomSettings: ObservableObject {
         if self.motionIntensity == 0 { self.motionIntensity = Self.defaultMotionIntensity }
         
         self.neuralEngineEnabled = UserDefaults.standard.bool(forKey: Keys.neuralEngineEnabled)
-        if !UserDefaults.standard.object(forKey: Keys.neuralEngineEnabled) {
+        if UserDefaults.standard.object(forKey: Keys.neuralEngineEnabled) == nil {
             self.neuralEngineEnabled = Self.defaultNeuralEngineEnabled
         }
         
@@ -324,12 +325,12 @@ public class AudioBloomSettings: ObservableObject {
         if self.spectrumSmoothing == 0 { self.spectrumSmoothing = Self.defaultSpectrumSmoothing }
         
         self.autoStart = UserDefaults.standard.bool(forKey: Keys.autoStart)
-        if !UserDefaults.standard.object(forKey: Keys.autoStart) {
+        if UserDefaults.standard.object(forKey: Keys.autoStart) == nil {
             self.autoStart = Self.defaultAutoStart
         }
         
         self.showFPS = UserDefaults.standard.bool(forKey: Keys.showFPS)
-        if !UserDefaults.standard.object(forKey: Keys.showFPS) {
+        if UserDefaults.standard.object(forKey: Keys.showFPS) == nil {
             self.showFPS = Self.defaultShowFPS
         }
         
@@ -358,7 +359,7 @@ public class AudioBloomSettings: ObservableObject {
         
         // Load visualization-related settings
         self.showBeatIndicator = UserDefaults.standard.bool(forKey: Keys.showBeatIndicator)
-        if !UserDefaults.standard.object(forKey: Keys.showBeatIndicator) {
+        if UserDefaults.standard.object(forKey: Keys.showBeatIndicator) == nil {
             self.showBeatIndicator = Self.defaultShowBeatIndicator
         }
         

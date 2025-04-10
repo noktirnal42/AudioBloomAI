@@ -55,7 +55,7 @@ let package = Package(
                 "MLEngine",
                 "AudioBloomUI"
             ],
-            exclude: ["README.md"],
+            exclude: ["README.md", "Resources/SupportFiles/Info.plist"],
             resources: [
                 .process("Resources")
             ]
@@ -81,6 +81,9 @@ let package = Package(
                 .product(name: "AudioKit", package: "AudioKit")
             ],
             exclude: ["README.md"],
+            resources: [
+                .process("Resources")
+            ],
             swiftSettings: [
                 // Any swift settings would go here
             ],
@@ -127,7 +130,7 @@ let package = Package(
             ],
             exclude: ["README.md"],
             resources: [
-                .process("Resources/Models")
+                .process("Resources")
             ],
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
@@ -190,7 +193,8 @@ let package = Package(
         .testTarget(
             name: "AudioBloomUITests",
             dependencies: ["AudioBloomUI"],
-            path: "Tests/AudioBloomUITests"
+            path: "Tests/AudioBloomUITests",
+            exclude: ["README.md"]
         )
     ],
     swiftLanguageModes: [.version("6")]

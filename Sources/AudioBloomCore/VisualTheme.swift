@@ -8,7 +8,7 @@ import SwiftUI
 
 public extension AudioBloomCore {
     /// Visual theme options for the application
-    enum VisualTheme: String, CaseIterable, Identifiable, Codable, Equatable {
+    enum VisualTheme: String, CaseIterable, Identifiable, Codable, Equatable, Sendable {
         /// Classic blue/purple theme
         case classic = "Classic"
         

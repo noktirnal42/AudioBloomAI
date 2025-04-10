@@ -1,9 +1,13 @@
 // AudioVisualizer.metal
-// Complete shader implementation for AudioBloomAI audio visualizer
+// Consolidated shader implementation for AudioBloomAI audio visualizer
 //
 
 #include <metal_stdlib>
 using namespace metal;
+
+//-----------------------------------------------------------
+// Shared Structures and Parameters
+//-----------------------------------------------------------
 
 // Structures for passing data between shaders
 struct VertexIn {
@@ -17,7 +21,7 @@ struct VertexOut {
     float4 color;
     float4 userData;         // Additional data to pass to fragment shader
 };
-
+// Audio visualization parameters struct
 struct AudioUniforms {
     // Audio data
     float audioData[1024];       // FFT frequency data
@@ -52,6 +56,80 @@ struct AudioUniforms {
     float neuralPleasantness;    // Pleasantness factor from neural analysis
     float neuralComplexity;      // Complexity factor from neural analysis
     float beatDetected;          // Beat detection flag (0.0 or 1.0)
+};
+
+//-----------------------------------------------------------
+// Enhanced Visualization Data Structures
+//-----------------------------------------------------------
+
+/// Structure to hold spectrum peak data
+struct SpectrumPeaks {
+    float peakValues[128];       // Peak values
+    float peakDecay[128];        // Decay rates
+    float peakHold[128];         // Hold timers
+};
+
+/// Structure to hold waveform history for persistence effect
+struct WaveformHistory {
+    float waveData[8][1024];  // Circular buffer of 8 frames, 1024 points each
+    int currentFrame;         // Current frame index
+    float opacity[8];         // Opacity for each historical frame
+};
+
+/// Structure for a physics-based particle
+struct Particle {
+    float2 position;
+    float2 velocity;
+    float size;
+    float life;
+    float maxLife;
+    float4 color;
+};
+
+/// Particle system state
+struct ParticleSystem {
+    Particle particles[1024];
+    uint activeCount;
+    uint nextIndex;
+    float spawnRate;
+    float2 emitterPosition;
+    float2 emitterSize;
+    float time;
+    float audioReactivity;
+    float attractorStrength;
+    float2 attractorPosition;
+};
+
+/// Structure to store neural visualization state
+struct NeuralPatternState {
+    // Pattern evolution parameters
+    float time;
+    float evolutionSpeed;
+    float complexity;
+    float energy;
+    float pleasantness;
+    
+    // Pattern control points (for organic shapes)
+    float2 controlPoints[16];
+    float controlPointInfluence[16];
+    
+    // Color evolution
+    float4 colorPalette[4];
+    float colorMix;
+    
+    // Beat reaction
+    float beatIntensity;
+    float beatDecay;
+    
+    // Flow field
+    float flowFieldScale;
+    float flowFieldSpeed;
+    float flowFieldStrength;
+    
+    // Pattern memory (for evolution)
+    float patternSeed;
+    float patternVariation;
+    int patternType;
 };
 
 //-----------------------------------------------------------
@@ -530,66 +608,60 @@ float4 neural_fragment_effect(float2 uv, float4 baseColor, constant AudioUniform
         pattern += beatRing * 0.3;
     }
     
-    // Apply different themes
-    if (uniforms.themeIndex < 1.0) {
-        // Classic theme - colorful flowing patterns
-        float hue = fract(pattern * 2.0 + uniforms.time * 0.1);
-        float sat = mix(0.5, 0.9, pleasantness);
-        float3 patternColor = hsv2rgb(float3(hue, sat, pattern * neuralEnergy));
-        color.rgb = mix(color.rgb, patternColor, 0.7);
-        
-        // Add beat highlights
-        color.rgb += uniforms.accentColor.rgb * beatEffect * 0.3;
-    } else if (uniforms.themeIndex < 2.0) {
-        // Neon theme - electric neural patterns
-        float3 neonBase = mix(uniforms.primaryColor.rgb, uniforms.secondaryColor.rgb, 
-                             sin(angle * 5.0 + uniforms.time) * 0.5 + 0.5);
-        
-        // Create electric effect with pattern
-        float electric = smoothstep(0.4, 0.6, pattern);
-        color.rgb = mix(color.rgb, neonBase, electric * neuralEnergy);
-        
-        // Add glow based on pattern intensity
-        color.rgb += neonBase * smoothstep(0.3, 0.7, pattern) * 0.5 * neuralEnergy;
-        
-        // Add beat pulse glow
-        color.rgb += uniforms.accentColor.rgb * beatEffect * 0.5;
-    } else if (uniforms.themeIndex < 3.0) {
-        // Monochrome theme - stark neural network representation
-        float network = step(mix(0.4, 0.7, complexity), pattern);
-        
-        // Add connecting lines
-        float lines = smoothstep(0.05, 0.0, 
-            abs(sin(uv.x * 20.0 * complexity + uniforms.time) * 
-                sin(uv.y * 20.0 * complexity + uniforms.time * 1.2)));
-        
-        float combined = max(network, lines * 0.7);
-        color.rgb = mix(color.rgb, float3(1.0), combined * neuralEnergy);
-        
-        // Add beat pulse
-        color.rgb *= 1.0 + beatEffect * 0.3;
-    } else {
-        // Cosmic theme - neural cosmos
-        float3 cosmicBase = mix(uniforms.primaryColor.rgb, uniforms.secondaryColor.rgb, 
-                               pattern);
-        
-        // Create nebula-like effect with neural patterns
-        float nebula = fbm(uv * mix(3.0, 8.0, complexity) + timeScale * 0.3, 4);
-        color.rgb = mix(color.rgb, cosmicBase, nebula * neuralEnergy * 0.8);
-        
-        // Add energy nodes
-        float energyNodes = step(0.7, pattern);
-        color.rgb += uniforms.accentColor.rgb * energyNodes * 0.5;
-        
-        // Add beat expansion waves
-        float beatWave = smoothstep(0.1, 0.0, abs(distToCenter - fract(uniforms.time + beatEffect)));
-        color.rgb += uniforms.accentColor.rgb * beatWave * beatEffect * 0.5;
-    }
-    
     return color;
 }
 
-// Post-processing effects
+// Waveform visualization fragment effects
+float4 waveform_fragment_effect(float2 uv, float4 baseColor, constant AudioUniforms &uniforms, float audioIntensity) {
+    float4 color = baseColor;
+    
+    // Create oscilloscope-like effect
+    float centerY = 0.5; // Center of waveform
+    float waveThickness = 0.02 * uniforms.sensitivity;
+    
+    // Calculate waveform height at this x-position
+    int waveIndex = int(uv.x * 1024);
+    float waveHeight = uniforms.audioData[waveIndex] * uniforms.sensitivity;
+    float waveY = centerY + waveHeight * 0.4; // Scale for visibility
+    
+    // Calculate distance to the wave line
+    float dist = abs(uv.y - waveY);
+    float waveIntensity = smoothstep(waveThickness, 0.0, dist);
+    
+    // Add time-based movement
+    float timeOffset = sin(uniforms.time * 2.0) * 0.01 * uniforms.motionIntensity;
+    waveIntensity += smoothstep(waveThickness, 0.0, abs(uv.y - (waveY + timeOffset))) * 0.5;
+    
+    // Apply different themes
+    if (uniforms.themeIndex < 1.0) {
+        // Classic theme - crisp line
+        color.rgb = mix(color.rgb, uniforms.primaryColor.rgb, waveIntensity);
+        
+        // Add subtle background grid
+        float grid = max(
+            smoothstep(0.03, 0.02, abs(fract(uv.x * 10.0) - 0.5)),
+            smoothstep(0.03, 0.02, abs(fract(uv.y * 10.0) - 0.5))
+        ) * 0.2;
+        color.rgb = mix(color.rgb, uniforms.secondaryColor.rgb, grid);
+    } else if (uniforms.themeIndex < 2.0) {
+        // Neon theme - glowing line
+        color.rgb = mix(color.rgb, uniforms.primaryColor.rgb, waveIntensity);
+        // Add glow effect
+        float glow = smoothstep(waveThickness * 3.0, 0.0, dist) * 0.7;
+        color.rgb += uniforms.secondaryColor.rgb * glow * (sin(uniforms.time * 5.0) * 0.2 + 0.8);
+    } else if (uniforms.themeIndex < 3.0) {
+        // Monochrome theme - simple black & white
+        color.rgb = mix(color.rgb, float3(1.0), waveIntensity);
+        // Add noise texture
+        float staticNoise = random(uv * 50.0 + uniforms.time * 0.1) * 0.1;
+        color.rgb += float3(staticNoise);
+    } else {
+        // Cosmic theme - multi-colored wave
+        float waveHue = fract(uv.x + uniforms.time * 0.1);
+        float3 waveColor = hsv2rgb(float3(waveHue, 0.7, 1.0));
+        color.rgb = mix(color.rgb, waveColor, waveIntensity);
+        
+        // Add subtle
 float4 apply_post_processing(float4 color, float2 uv, constant AudioUniforms &uniforms) {
     // Apply vignette effect
     float2 center = float2(0.5, 0.5);
