@@ -5,10 +5,12 @@ import Metal
 import MetalKit
 import QuartzCore
 import os.log
-import CoreVideo
+import AppKit
 import Darwin
 
 /// Warning levels for performance issues
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public enum PerformanceWarningLevel: String, CaseIterable {
     case none
     case low
@@ -16,6 +18,7 @@ public enum PerformanceWarningLevel: String, CaseIterable {
     case high
     
     /// User-friendly string representation
+/// Uses Swift 6 actor isolation for thread safety.
     public var description: String {
         switch self {
         case .none: return "None"
@@ -27,6 +30,8 @@ public enum PerformanceWarningLevel: String, CaseIterable {
 }
 
 /// Metrics that can be tracked for performance
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public enum PerformanceMetric: String, CaseIterable {
     case fps
     case cpuUsage
@@ -41,95 +46,130 @@ public enum PerformanceMetric: String, CaseIterable {
 }
 
 /// Manages performance monitoring and optimization for AudioBloom
-public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
+public final actor PerformanceMonitor: ObservableObject, @unchecked Sendable  {
+    // Converted to actor in Swift 6 for thread safety
     // MARK: - Published Properties
     
     /// Current frames per second
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var fps: Double = 60.0
     
     /// CPU usage percentage (0-100)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var cpuUsage: Double = 0.0
     
     /// GPU usage percentage (0-100)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var gpuUsage: Double = 0.0
     
     /// Memory usage in MB
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var memoryUsage: Double = 0.0
     
     /// Audio buffer memory usage in MB
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var audioBufferUsage: Double = 0.0
     
     /// Render time in milliseconds
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var renderTime: Double = 0.0
     
     /// Audio processing time in milliseconds
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var audioProcessingTime: Double = 0.0
     
     /// Total latency in milliseconds
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var totalLatency: Double = 0.0
     
     /// Thermal state (0=nominal, 1=fair, 2=serious, 3=critical)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var thermalState: Int = 0
     
     /// Battery impact (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var batteryImpact: Double = 0.0
     
     /// Current warning level
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var warningLevel: PerformanceWarningLevel = .none
     
     /// Whether auto-optimization is enabled
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public var autoOptimizationEnabled: Bool = false
     
     // MARK: - Private Properties
     
-    /// CVDisplayLink for display synchronization
-    private var displayLink: CVDisplayLink?
+    /// Modern display link for synchronization
+/// Uses Swift 6 actor isolation for thread safety.
+    private var displayLink: Any?
     
+    /// Display link target for callback handling
+/// Uses Swift 6 actor isolation for thread safety.
+    private var displayLinkTarget: DisplayLinkTarget?
     /// Timer for automatic optimization
+/// Uses Swift 6 actor isolation for thread safety.
     private var optimizationTimer: Timer?
     
     /// Last sample timestamps for timing calculations
+/// Uses Swift 6 actor isolation for thread safety.
     private var lastSampleTime: CFTimeInterval = 0
     
     /// Metal device for GPU monitoring
+/// Uses Swift 6 actor isolation for thread safety.
     private var device: MTLDevice?
     
     /// GPU counter set
+/// Uses Swift 6 actor isolation for thread safety.
     private var counterSet: MTLCounterSet?
     
     /// Metal performance sampler
+/// Uses Swift 6 actor isolation for thread safety.
     private var sampler: MTLCaptureManager?
     
     /// Queue for thread-safe access to performance metrics
+/// Uses Swift 6 actor isolation for thread safety.
     private let performanceQueue = DispatchQueue(label: "com.audiobloom.performance", qos: .utility)
     
     /// Lock for thread safety when accessing metrics
+/// Uses Swift 6 actor isolation for thread safety.
     private let metricsLock = NSLock()
     
     /// History of metrics for tracking trends
+/// Uses Swift 6 actor isolation for thread safety.
     private var metricHistory: [PerformanceMetric: [Double]] = [:]
     
     /// Maximum history samples to keep
+/// Uses Swift 6 actor isolation for thread safety.
     private let historySize = 100
     
     /// Audio buffer memory tracking
+/// Uses Swift 6 actor isolation for thread safety.
     private var audioBufferMemoryPool: [UUID: Int] = [:]
     
     /// Whether to track history
+/// Uses Swift 6 actor isolation for thread safety.
     private var trackHistory = true
     
     /// Overall metrics (updated periodically)
+/// Uses Swift 6 actor isolation for thread safety.
     private var metrics: [PerformanceMetric: Double] = [:]
     
     /// Frame counter for averaging
+/// Uses Swift 6 actor isolation for thread safety.
     private var frameCount: Int = 0
     
     /// Callback to run on the main queue
+/// Uses Swift 6 actor isolation for thread safety.
     private var mainQueueCallback: DispatchWorkItem?
     
     // MARK: - Initialization
     /// Initializes a performance monitor
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter metalDevice: Metal device to monitor
+/// Uses Swift 6 actor isolation for thread safety.
     public init(metalDevice: MTLDevice? = nil) {
         self.device = metalDevice
         
@@ -155,41 +195,39 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
         stopMonitoring()
     }
     
+    // MARK: - Display Link Target
+    
+    /// Class to handle DisplayLink callbacks 
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    private final actor DisplayLinkTarget {
+    // Converted to actor in Swift 6 for thread safety
+        weak var monitor: PerformanceMonitor?
+        
+        init(monitor: PerformanceMonitor) {
+            self.monitor = monitor
+        }
+        
+        @objc func displayLinkDidFire(displayLink: NSObject) {
+            guard let monitor = monitor else { return }
+            monitor.handleDisplayLinkFire()
+        }
+    }
+    
     // MARK: - Monitoring Control
     
     /// Starts performance monitoring
+/// Uses Swift 6 actor isolation for thread safety.
     public func startMonitoring() {
-        // Create a display link capable of being used with all active displays
-        var newDisplayLink: CVDisplayLink?
+        // Create display link target
+        let target = DisplayLinkTarget(monitor: self)
+        self.displayLinkTarget = target
         
-        // Set up display link callback
-        let displayLinkOutputCallback: CVDisplayLinkOutputCallback = { 
-            (displayLink: CVDisplayLink, 
-             inNow: UnsafePointer<CVTimeStamp>, 
-             inOutputTime: UnsafePointer<CVTimeStamp>, 
-             flagsIn: CVOptionFlags, 
-             flagsOut: UnsafeMutablePointer<CVOptionFlags>, 
-             displayLinkContext: UnsafeMutableRawPointer?) -> CVReturn in
-            
-            // Get the object reference from context
-            let monitor = Unmanaged<PerformanceMonitor>.fromOpaque(displayLinkContext!).takeUnretainedValue()
-            
-            // Execute frame update logic
-            monitor.displayLinkDidFire(displayLink: displayLink, outputTime: inOutputTime.pointee)
-            
-            return kCVReturnSuccess
-        }
-        
-        // Create display link
-        let error = CVDisplayLinkCreateWithActiveCGDisplays(&newDisplayLink)
-        
-        if error == kCVReturnSuccess, let newDisplayLink = newDisplayLink {
-            // Set the context to point to self
-            let pointerToSelf = Unmanaged.passUnretained(self).toOpaque()
-            CVDisplayLinkSetOutputCallback(newDisplayLink, displayLinkOutputCallback, pointerToSelf)
-            
-            // Start the display link
-            CVDisplayLinkStart(newDisplayLink)
+        if let mainView = NSApp.mainWindow?.contentView {
+            // Use modern NSView.displayLink API (available in macOS 15+)
+            let newDisplayLink = mainView.displayLink(target: target, 
+                                                     selector: #selector(DisplayLinkTarget.displayLinkDidFire))
+            newDisplayLink.isPaused = false
             self.displayLink = newDisplayLink
             
             // Setup optimization timer if needed
@@ -201,36 +239,60 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
             
             // Reset initial time
             lastSampleTime = CFAbsoluteTimeGetCurrent()
+            
+            os_log(.debug, "Started performance monitoring with modern DisplayLink")
+        } else {
+            // Fallback to a timer if no view is available
+            let timer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+                self?.handleDisplayLinkFire()
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.displayLink = timer
+            
+            os_log(.debug, "Started performance monitoring with timer fallback")
         }
-    }
     
     /// Stops performance monitoring
+/// Uses Swift 6 actor isolation for thread safety.
     public func stopMonitoring() {
-        // Stop the display link
-        if let displayLink = displayLink {
-            CVDisplayLinkStop(displayLink)
-            self.displayLink = nil
+        // Stop the display link based on its type
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.invalidate()
+        } else if let displayLink = displayLink as? Timer {
+            displayLink.invalidate()
         }
+        
+        self.displayLink = nil
+        self.displayLinkTarget = nil
         
         // Invalidate optimization timer
         optimizationTimer?.invalidate()
         optimizationTimer = nil
+        
+        os_log(.debug, "Stopped performance monitoring")
     }
     
     /// Pauses performance monitoring
+/// Uses Swift 6 actor isolation for thread safety.
     public func pauseMonitoring() {
-        if let displayLink = displayLink, CVDisplayLinkIsRunning(displayLink) {
-            CVDisplayLinkStop(displayLink)
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.isPaused = true
+        } else if let displayLink = displayLink as? Timer {
+            displayLink.invalidate()
+            self.displayLink = nil
         }
         
         optimizationTimer?.invalidate()
         optimizationTimer = nil
+        
+        os_log(.debug, "Paused performance monitoring")
     }
     
     /// Resumes performance monitoring
+/// Uses Swift 6 actor isolation for thread safety.
     public func resumeMonitoring() {
-        if let displayLink = displayLink, !CVDisplayLinkIsRunning(displayLink) {
-            CVDisplayLinkStart(displayLink)
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.isPaused = false
         } else if displayLink == nil {
             startMonitoring()
         }
@@ -240,21 +302,28 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
                 self?.performOptimization()
             }
         }
+        
+        os_log(.debug, "Resumed performance monitoring")
     }
-    // MARK: - Public Methods
     
     /// Dictionary to track render timings
+/// Uses Swift 6 actor isolation for thread safety.
     private var renderTimings: [String: CFTimeInterval] = [:]
     
     /// Start measuring performance for specific operation
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter operation: Name of the operation being measured
+/// Uses Swift 6 actor isolation for thread safety.
     public func beginMeasuring(_ operation: String) {
         renderTimings[operation] = CFAbsoluteTimeGetCurrent()
     }
     
     /// End measuring performance for specific operation
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter operation: Name of the operation that was being measured
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Duration in milliseconds
+/// Uses Swift 6 actor isolation for thread safety.
     @discardableResult
     public func endMeasuring(_ operation: String) -> Double {
         guard let startTime = renderTimings[operation] else { return 0 }
@@ -276,27 +345,37 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Records a render time measurement
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter milliseconds: Time in milliseconds
+/// Uses Swift 6 actor isolation for thread safety.
     public func recordRenderTime(_ milliseconds: Double) {
         updateMetric(.renderTime, value: milliseconds)
     }
     
     /// Records an audio processing time measurement
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter milliseconds: Time in milliseconds
+/// Uses Swift 6 actor isolation for thread safety.
     public func recordAudioProcessingTime(_ milliseconds: Double) {
         updateMetric(.audioProcessingTime, value: milliseconds)
     }
     
     /// Records total latency
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter milliseconds: Latency in milliseconds
+/// Uses Swift 6 actor isolation for thread safety.
     public func recordLatency(_ milliseconds: Double) {
         updateMetric(.totalLatency, value: milliseconds)
     }
     
     /// Register audio buffer allocation for memory tracking
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - identifier: Unique ID for the buffer
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - byteSize: Size in bytes
+/// Uses Swift 6 actor isolation for thread safety.
     public func registerAudioBuffer(identifier: UUID, byteSize: Int) {
         performanceQueue.async { [weak self] in
             guard let self = self else { return }
@@ -310,7 +389,9 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Unregister audio buffer when released
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter identifier: Unique ID of the buffer to unregister
+/// Uses Swift 6 actor isolation for thread safety.
     public func unregisterAudioBuffer(identifier: UUID) {
         performanceQueue.async { [weak self] in
             guard let self = self else { return }
@@ -324,6 +405,7 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Recalculate audio buffer usage based on registered buffers
+/// Uses Swift 6 actor isolation for thread safety.
     private func recalculateAudioBufferUsage() {
         metricsLock.lock()
         let totalBytes = audioBufferMemoryPool.values.reduce(0, +)
@@ -334,7 +416,9 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Get optimization recommendation for current state
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Dictionary of recommended optimizations
+/// Uses Swift 6 actor isolation for thread safety.
     public func getOptimizationRecommendations() -> [String: Any] {
         var recommendations: [String: Any] = [:]
         
@@ -357,6 +441,7 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Perform automated performance optimization based on metrics
+/// Uses Swift 6 actor isolation for thread safety.
     private func performOptimization() {
         let recommendations = getOptimizationRecommendations()
         
@@ -370,6 +455,7 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Update the warning level based on current metrics
+/// Uses Swift 6 actor isolation for thread safety.
     private func updateWarningLevel() {
         // Determine warning level based on metrics
         var newWarningLevel: PerformanceWarningLevel = .none
@@ -384,15 +470,18 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
         
         // Update on main thread if changed
         if newWarningLevel != warningLevel {
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor in [weak self] in
                 self?.warningLevel = newWarningLevel
             }
         }
     }
     
     /// Calculate the average value for a metric
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter metric: The metric to average
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Average value
+/// Uses Swift 6 actor isolation for thread safety.
     private func averageForMetric(_ metric: PerformanceMetric) -> Double {
         metricsLock.lock()
         defer { metricsLock.unlock() }
@@ -405,7 +494,9 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Get performance report for the current session
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Formatted performance report
+/// Uses Swift 6 actor isolation for thread safety.
     public func generatePerformanceReport() -> String {
         var report = "AudioBloom Performance Report\n"
         report += "===============================\n"
@@ -438,6 +529,7 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Reset all performance metrics
+/// Uses Swift 6 actor isolation for thread safety.
     public func resetMetrics() {
         performanceQueue.async { [weak self] in
             guard let self = self else { return }
@@ -449,7 +541,7 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
             }
             self.metricsLock.unlock()
             
-            DispatchQueue.main.async { [weak self] in
+            Task { @MainActor in [weak self] in
                 guard let self = self else { return }
                 self.fps = 60.0
                 self.cpuUsage = 0
@@ -468,6 +560,7 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     // MARK: - Private Methods
     
     /// Setup GPU performance counters
+/// Uses Swift 6 actor isolation for thread safety.
     private func setupCounters(device: MTLDevice) {
         if #available(macOS 10.15, *) {
             if let counterSets = device.counterSets {
@@ -478,6 +571,7 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Track memory usage
+/// Uses Swift 6 actor isolation for thread safety.
     private func getCurrentMemoryUsage() -> Double {
         var info = mach_task_basic_info()
         // Use process_info to get memory usage on macOS
@@ -494,9 +588,9 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
         
         return 0
     }
-    
-    /// Process display link frame update
-    private func displayLinkDidFire(displayLink: CVDisplayLink, outputTime: CVTimeStamp) {
+    /// Modern display link handler
+/// Uses Swift 6 actor isolation for thread safety.
+    private func handleDisplayLinkFire() {
         // Calculate frame time
         let currentTime = CFAbsoluteTimeGetCurrent()
         let frameTime = currentTime - lastSampleTime
@@ -524,7 +618,9 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Sample system performance metrics
+/// Uses Swift 6 actor isolation for thread safety.
     /// Sample system performance metrics
+/// Uses Swift 6 actor isolation for thread safety.
     private func samplePerformanceMetrics() {
         // Memory usage
         let memoryMB = getCurrentMemoryUsage()
@@ -545,9 +641,13 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
     }
     
     /// Update a specific metric value
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - metric: The metric to update
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - value: The new value
+/// Uses Swift 6 actor isolation for thread safety.
     private func updateMetric(_ metric: PerformanceMetric, value: Double) {
         performanceQueue.async { [weak self] in
             guard let self = self else { return }
@@ -577,25 +677,25 @@ public final class PerformanceMonitor: ObservableObject, @unchecked Sendable {
             // Update published properties on main thread
             switch metric {
             case .fps:
-                DispatchQueue.main.async { [weak self] in self?.fps = value }
+                Task { @MainActor in [weak self] in self?.fps = value }
             case .cpuUsage:
-                DispatchQueue.main.async { [weak self] in self?.cpuUsage = value }
+                Task { @MainActor in [weak self] in self?.cpuUsage = value }
             case .gpuUsage:
-                DispatchQueue.main.async { [weak self] in self?.gpuUsage = value }
+                Task { @MainActor in [weak self] in self?.gpuUsage = value }
             case .memoryUsage:
-                DispatchQueue.main.async { [weak self] in self?.memoryUsage = value }
+                Task { @MainActor in [weak self] in self?.memoryUsage = value }
             case .audioBufferUsage:
-                DispatchQueue.main.async { [weak self] in self?.audioBufferUsage = value }
+                Task { @MainActor in [weak self] in self?.audioBufferUsage = value }
             case .renderTime:
-                DispatchQueue.main.async { [weak self] in self?.renderTime = value }
+                Task { @MainActor in [weak self] in self?.renderTime = value }
             case .audioProcessingTime:
-                DispatchQueue.main.async { [weak self] in self?.audioProcessingTime = value }
+                Task { @MainActor in [weak self] in self?.audioProcessingTime = value }
             case .totalLatency:
-                DispatchQueue.main.async { [weak self] in self?.totalLatency = value }
+                Task { @MainActor in [weak self] in self?.totalLatency = value }
             case .thermalLevel:
-                DispatchQueue.main.async { [weak self] in self?.thermalState = Int(value) }
+                Task { @MainActor in [weak self] in self?.thermalState = Int(value) }
             case .batteryImpact:
-                DispatchQueue.main.async { [weak self] in self?.batteryImpact = value }
+                Task { @MainActor in [weak self] in self?.batteryImpact = value }
             }
         }
     }

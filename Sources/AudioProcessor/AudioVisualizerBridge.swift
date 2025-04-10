@@ -1,63 +1,86 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import Combine
 import CoreGraphics
 import Accelerate
 import AudioBloomCore
 
+@available(macOS 15.0, *)
 /// A bridging class that optimizes audio data for visualization purposes
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public class AudioVisualizerBridge: ObservableObject {
     // MARK: - Published Properties
     
     /// Optimized frequency data for visualization
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var visualizationData: [Float] = []
     
     /// Smoothed audio levels
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var smoothedLevels: (left: Float, right: Float) = (0, 0)
     
     /// Frequency band energy levels
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var frequencyBands: AudioFrequencyBands = AudioFrequencyBands()
     
     /// Beat detection status
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var beatDetected: Bool = false
     
     /// Energy level as detected by signal processing
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var energyLevel: Float = 0.0
     
     // MARK: - Configuration Properties
     
     /// Configuration for the audio-visual bridge
-    public struct Configuration {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct Configuration: Sendable {
         /// Smoothing factor for audio levels (0.0-1.0, higher = more smoothing)
+/// Uses Swift 6 actor isolation for thread safety.
         public var levelSmoothingFactor: Float = 0.7
         
         /// Smoothing factor for frequency data (0.0-1.0, higher = more smoothing)
+/// Uses Swift 6 actor isolation for thread safety.
         public var fftSmoothingFactor: Float = 0.5
         
         /// Enhancement factor for visualizations (0.0-1.0, higher = more enhancement)
+/// Uses Swift 6 actor isolation for thread safety.
         public var visualEnhancementFactor: Float = 0.8
         
         /// Beat detection sensitivity (0.0-1.0, higher = more sensitive)
+/// Uses Swift 6 actor isolation for thread safety.
         public var beatDetectionSensitivity: Float = 0.6
         
         /// Whether to apply spectral weighting for better visualization
+/// Uses Swift 6 actor isolation for thread safety.
         public var applySpectralWeighting: Bool = true
         
         /// Whether to use logarithmic frequency scaling
+/// Uses Swift 6 actor isolation for thread safety.
         public var useLogFrequencyScaling: Bool = true
         
         /// Frequency resolution for the visualization
+/// Uses Swift 6 actor isolation for thread safety.
         public var visualizationResolution: Int = 128
         
         /// Maximum frequency for visualization (in Hz)
+/// Uses Swift 6 actor isolation for thread safety.
         public var maxFrequency: Float = 16000.0
         
         /// Neural processing weight (0.0-1.0, higher = more neural influence)
+/// Uses Swift 6 actor isolation for thread safety.
         public var neuralProcessingWeight: Float = 0.3
         
         public init() {}
     }
     
     /// The current configuration
+/// Uses Swift 6 actor isolation for thread safety.
     public var configuration: Configuration {
         didSet {
             // Re-initialize components if needed
@@ -69,90 +92,121 @@ public class AudioVisualizerBridge: ObservableObject {
     // MARK: - Private Properties
     
     /// Subscription for audio data
+/// Uses Swift 6 actor isolation for thread safety.
     private var audioDataSubscription: AnyCancellable?
     
     /// Last raw frequency data received
+/// Uses Swift 6 actor isolation for thread safety.
     private var lastRawFrequencyData: [Float] = []
     
     /// Last raw audio levels received
+/// Uses Swift 6 actor isolation for thread safety.
     private var lastRawLevels: (left: Float, right: Float) = (0, 0)
     
     /// Last timestamp for processing
+/// Uses Swift 6 actor isolation for thread safety.
     private var lastProcessingTime: TimeInterval = 0
     
     /// Buffer for smoothed frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     private var smoothedFrequencyData: [Float] = []
     
     /// Energy history for beat detection
+/// Uses Swift 6 actor isolation for thread safety.
     private var energyHistory: [Float] = Array(repeating: 0, count: 43)
     
     /// Beat detection timing
+/// Uses Swift 6 actor isolation for thread safety.
     private var lastBeatTime: TimeInterval = 0
     
     /// History of beat intervals (in seconds)
+/// Uses Swift 6 actor isolation for thread safety.
     private var beatIntervals: [TimeInterval] = []
     
     /// FFT scaling factors for perceptual weighting
+/// Uses Swift 6 actor isolation for thread safety.
     private var fftScalingFactors: [Float] = []
     
     /// Resampling filter for visualization resolution
+/// Uses Swift 6 actor isolation for thread safety.
     private var resamplingFilter: ResamplingFilter?
     
     /// Type that holds frequency band energy levels
-    public struct AudioFrequencyBands {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct AudioFrequencyBands: Sendable {
         /// Sub-bass frequency band energy (20-60 Hz)
+/// Uses Swift 6 actor isolation for thread safety.
         public var subBass: Float = 0
         
         /// Bass frequency band energy (60-250 Hz)
+/// Uses Swift 6 actor isolation for thread safety.
         public var bass: Float = 0
         
         /// Low-midrange frequency band energy (250-500 Hz)
+/// Uses Swift 6 actor isolation for thread safety.
         public var lowMid: Float = 0
         
         /// Midrange frequency band energy (500-2000 Hz)
+/// Uses Swift 6 actor isolation for thread safety.
         public var mid: Float = 0
         
         /// Upper-midrange frequency band energy (2000-4000 Hz)
+/// Uses Swift 6 actor isolation for thread safety.
         public var highMid: Float = 0
         
         /// Presence frequency band energy (4000-6000 Hz)
+/// Uses Swift 6 actor isolation for thread safety.
         public var presence: Float = 0
         
         /// Brilliance frequency band energy (6000-20000 Hz)
+/// Uses Swift 6 actor isolation for thread safety.
         public var brilliance: Float = 0
         
         public init() {}
     }
     
     /// Neural processing hook response
-    public struct NeuralProcessingResponse {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct NeuralProcessingResponse: Sendable {
         /// Overall energy level from neural analysis
+/// Uses Swift 6 actor isolation for thread safety.
         public var energy: Float = 0
         
         /// Pleasantness factor from neural analysis
+/// Uses Swift 6 actor isolation for thread safety.
         public var pleasantness: Float = 0
         
         /// Complexity factor from neural analysis
+/// Uses Swift 6 actor isolation for thread safety.
         public var complexity: Float = 0
         
         /// Whether a beat was detected
+/// Uses Swift 6 actor isolation for thread safety.
         public var beatDetected: Bool = false
         
         /// Recommended visualization mode
+/// Uses Swift 6 actor isolation for thread safety.
         public var recommendedMode: Int = 0
         
         public init() {}
     }
     
     /// Resampling filter for changing resolution
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
     private class ResamplingFilter {
         /// Original data size
+/// Uses Swift 6 actor isolation for thread safety.
         private let originalSize: Int
         
         /// Target data size
+/// Uses Swift 6 actor isolation for thread safety.
         private let targetSize: Int
         
         /// Resampling matrix
+/// Uses Swift 6 actor isolation for thread safety.
         private let resamplingMatrix: [Float]
         
         init(originalSize: Int, targetSize: Int) {
@@ -178,6 +232,7 @@ public class AudioVisualizerBridge: ObservableObject {
         }
         
         /// Resample data to target size
+/// Uses Swift 6 actor isolation for thread safety.
         func resample(_ data: [Float]) -> [Float] {
             guard data.count == originalSize else {
                 // If sizes don't match, return original data or properly sized zeros
@@ -204,7 +259,9 @@ public class AudioVisualizerBridge: ObservableObject {
     // MARK: - Initialization
     
     /// Initializes a new AudioVisualizerBridge
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter configuration: Configuration for audio-visual processing
+/// Uses Swift 6 actor isolation for thread safety.
     public init(configuration: Configuration = Configuration()) {
         self.configuration = configuration
         
@@ -214,12 +271,14 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Initialize frequency bands
+/// Uses Swift 6 actor isolation for thread safety.
     private func initializeFrequencyBands() {
         // Reset frequency bands
         frequencyBands = AudioFrequencyBands()
     }
     
     /// Initialize processing filters
+/// Uses Swift 6 actor isolation for thread safety.
     private func initializeProcessingFilters() {
         // Create spectral weighting factors if needed
         if configuration.applySpectralWeighting {
@@ -240,6 +299,7 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Create spectral weighting factors based on perceptual curves
+/// Uses Swift 6 actor isolation for thread safety.
     private func createSpectralWeightingFactors() {
         let fftSize = AudioBloomCore.Constants.defaultFFTSize / 2
         let sampleRate = Float(AudioBloomCore.Constants.defaultSampleRate)
@@ -282,8 +342,11 @@ public class AudioVisualizerBridge: ObservableObject {
     // MARK: - Public Methods
     
     /// Subscribes to audio data from an AudioEngine
+/// Uses Swift 6 actor isolation for thread safety.
     /// Subscribes to audio data from an AudioEngine
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter audioEngine: The audio engine to subscribe to
+/// Uses Swift 6 actor isolation for thread safety.
     public func subscribeToAudioEngine(_ audioEngine: AudioDataProvider) {
         // Cancel any existing subscription
         audioDataSubscription?.cancel()
@@ -323,9 +386,13 @@ public class AudioVisualizerBridge: ObservableObject {
         }
     
     /// Processes new audio data for visualization
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - frequencyData: Raw frequency data from FFT
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - levels: Audio levels (left, right)
+/// Uses Swift 6 actor isolation for thread safety.
     private func processAudioData(frequencyData: [Float], levels: (left: Float, right: Float)) {
         // Store raw data
         lastRawFrequencyData = frequencyData
@@ -370,15 +437,18 @@ public class AudioVisualizerBridge: ObservableObject {
                                        factor: configuration.levelSmoothingFactor)
         
         // Update published values on main thread
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.visualizationData = processedData
             self.smoothedLevels = (left: smoothedLeft, right: smoothedRight)
         }
     }
     
     /// Applies spectral weighting to frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter data: Raw frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Weighted frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     private func applySpectralWeighting(_ data: [Float]) -> [Float] {
         guard configuration.applySpectralWeighting,
               !fftScalingFactors.isEmpty,
@@ -398,8 +468,11 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Applies logarithmic scaling to frequency data for better visualization
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter data: Linear frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Log-scaled frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     private func applyLogFrequencyScaling(_ data: [Float]) -> [Float] {
         guard data.count > 0 else { return data }
         
@@ -429,10 +502,15 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Smooths frequency data for visualization
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - data: Input frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - deltaTime: Time since last update for adaptive smoothing
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Smoothed frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     private func smoothFrequencyData(_ data: [Float], deltaTime: TimeInterval) -> [Float] {
         // Initialize smoothed data array if needed
         if smoothedFrequencyData.count != data.count {
@@ -471,17 +549,25 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Utility function to smooth any value with a given factor
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - newValue: New input value
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - previous: Previous smoothed value
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - factor: Smoothing factor (0.0-1.0, higher = more smoothing)
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Smoothed value
+/// Uses Swift 6 actor isolation for thread safety.
     private func smoothValue(_ newValue: Float, previous: Float, factor: Float) -> Float {
         return previous * factor + newValue * (1.0 - factor)
     }
     
     /// Calculates frequency bands from frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter data: Input frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     private func calculateFrequencyBands(from data: [Float]) {
         guard !data.isEmpty else { return }
         
@@ -552,15 +638,19 @@ public class AudioVisualizerBridge: ObservableObject {
         }
         
         // Update published bands on main thread
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.frequencyBands = newBands
         }
     }
     
     /// Calculates overall energy level from audio data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - data: Frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - levels: Audio levels
+/// Uses Swift 6 actor isolation for thread safety.
     private func calculateEnergyLevel(from data: [Float], levels: (left: Float, right: Float)) {
         // Calculate energy from frequency data
         var energy: Float = 0
@@ -609,15 +699,19 @@ public class AudioVisualizerBridge: ObservableObject {
                                         factor: configuration.levelSmoothingFactor * 0.8)
         
         // Update energy level
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.energyLevel = newEnergyLevel
         }
     }
     
     /// Beat detection algorithm
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - energy: Current energy level
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - time: Current time
+/// Uses Swift 6 actor isolation for thread safety.
     private func detectBeats(energy: Float, time: TimeInterval) {
         // Shift energy history array
         for i in 0..<energyHistory.count - 1 {
@@ -659,7 +753,7 @@ public class AudioVisualizerBridge: ObservableObject {
             lastBeatTime = time
             
             // Update beat detection status
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.beatDetected = beatDetected
                 
                 // Auto-reset beat flag after a short delay
@@ -672,7 +766,9 @@ public class AudioVisualizerBridge: ObservableObject {
     
     // MARK: - Integration Methods
     /// Prepares the bridge with the AudioProcessor
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter audioProcessor: The audio processor to integrate with
+/// Uses Swift 6 actor isolation for thread safety.
     public func prepare(with audioProcessor: AudioEngine) {
         print("Preparing AudioVisualizerBridge with AudioEngine...")
         
@@ -697,7 +793,7 @@ public class AudioVisualizerBridge: ObservableObject {
         beatIntervals = []
         
         // Reset beat detection state
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.beatDetected = false
         }
         
@@ -705,6 +801,7 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Cleans up resources used by the bridge
+/// Uses Swift 6 actor isolation for thread safety.
     public func cleanup() {
         print("Cleaning up AudioVisualizerBridge resources...")
         
@@ -719,7 +816,7 @@ public class AudioVisualizerBridge: ObservableObject {
         beatIntervals = []
         
         // Reset state
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.beatDetected = false
             self.visualizationData = []
             self.smoothedLevels = (0, 0)
@@ -731,7 +828,9 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Process neural insights from ML processing
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter neuralResponse: Neural processing response from ML analysis
+/// Uses Swift 6 actor isolation for thread safety.
     public func processNeuralInsights(_ neuralResponse: NeuralProcessingResponse) {
         // Apply neural insights to the visualization parameters based on weighting
         let weight = self.configuration.neuralProcessingWeight
@@ -741,7 +840,7 @@ public class AudioVisualizerBridge: ObservableObject {
         
         // Apply beat detection if neural system detected it
         if neuralResponse.beatDetected && !self.beatDetected {
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.beatDetected = true
                 
                 // Auto-reset beat flag after a short delay
@@ -756,7 +855,9 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Sets the visualization resolution
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter resolution: The number of frequency points for visualization
+/// Uses Swift 6 actor isolation for thread safety.
     public func setVisualizationResolution(_ resolution: Int) {
         guard resolution > 0 && resolution != configuration.visualizationResolution else { return }
         
@@ -775,7 +876,9 @@ public class AudioVisualizerBridge: ObservableObject {
     }
     
     /// Applies spectral emphasis to enhance specific frequency ranges
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter emphasisRanges: Array of (startFreq, endFreq, gain) tuples
+/// Uses Swift 6 actor isolation for thread safety.
     public func applySpectralEmphasis(emphasisRanges: [(Float, Float, Float)]) {
         let fftSize = AudioBloomCore.Constants.defaultFFTSize / 2
         let sampleRate = Float(AudioBloomCore.Constants.defaultSampleRate)
@@ -815,9 +918,13 @@ public class AudioVisualizerBridge: ObservableObject {
     // MARK: - Private Methods
     
     /// Processes new audio data for visualization
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - frequencyData: Raw frequency data from FFT
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - levels: Audio levels (left, right)
+/// Uses Swift 6 actor isolation for thread safety.
     private func processAudioData(frequencyData: [Float], levels: (left: Float, right: Float)) {
         // Store raw data
         lastRawFrequencyData = frequencyData

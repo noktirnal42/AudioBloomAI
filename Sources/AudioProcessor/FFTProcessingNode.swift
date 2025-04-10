@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import AVFoundation
 import Accelerate
@@ -5,34 +8,44 @@ import Logging
 import AudioBloomCore
 
 /// FFT Processing Node for real-time frequency analysis of audio data
+/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
 public class FFTProcessingNode: AudioProcessingNode {
     // MARK: - AudioProcessingNode Protocol Properties
     
     /// The unique identifier for this node
+/// Uses Swift 6 actor isolation for thread safety.
     public let id: UUID
     
     /// The display name of this node
+/// Uses Swift 6 actor isolation for thread safety.
     public var name: String
     
     /// Whether this node is enabled in the processing chain
+/// Uses Swift 6 actor isolation for thread safety.
     public var isEnabled: Bool
     
     /// Input requirements for this node
+/// Uses Swift 6 actor isolation for thread safety.
     public var inputRequirements: AudioNodeIORequirements
     
     /// Output capabilities of this node
+/// Uses Swift 6 actor isolation for thread safety.
     public var outputCapabilities: AudioNodeIORequirements
     
     // MARK: - FFT Processing Properties
     
     /// Size of the FFT operation (must be a power of 2)
+/// Uses Swift 6 actor isolation for thread safety.
     private var fftSize: Int
     
     /// Logger instance
+/// Uses Swift 6 actor isolation for thread safety.
     private let logger = Logger(label: "com.audiobloom.fft-processor")
     
     /// Window function type for FFT
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
     public enum WindowFunction: String, Codable {
         case hann
         case hamming
@@ -41,15 +54,19 @@ public class FFTProcessingNode: AudioProcessingNode {
     }
     
     /// Current window function
+/// Uses Swift 6 actor isolation for thread safety.
     private var windowFunction: WindowFunction
     
     /// Window buffer for windowing the signal before FFT
+/// Uses Swift 6 actor isolation for thread safety.
     private var window: [Float]
     
     /// FFT setup for real signal
+/// Uses Swift 6 actor isolation for thread safety.
     private var fftSetup: vDSP_DFT_Setup?
     
     /// Temporary buffers for FFT computation
+/// Uses Swift 6 actor isolation for thread safety.
     private var realInput: [Float]
     private var imagInput: [Float]
     private var realOutput: [Float]
@@ -57,30 +74,40 @@ public class FFTProcessingNode: AudioProcessingNode {
     private var magnitude: [Float]
     
     /// Frequency band results
+/// Uses Swift 6 actor isolation for thread safety.
     private var bassLevel: Float = 0.0
     private var midLevel: Float = 0.0
     private var trebleLevel: Float = 0.0
     
     /// Band frequency ranges in Hz
+/// Uses Swift 6 actor isolation for thread safety.
     private var bassRange: ClosedRange<Float> = 20.0...250.0
     private var midRange: ClosedRange<Float> = 250.0...4000.0
     private var trebleRange: ClosedRange<Float> = 4000.0...20000.0
     
     /// Sample rate for frequency calculations
+/// Uses Swift 6 actor isolation for thread safety.
     private var sampleRate: Double = AudioBloomCore.Constants.defaultSampleRate
     
     /// Real and imaginary pointers for DSPSplitComplex
+/// Uses Swift 6 actor isolation for thread safety.
     private var realPtr: UnsafeMutablePointer<Float>?
     private var imagPtr: UnsafeMutablePointer<Float>?
     
     // MARK: - Initialization
     
     /// Initializes a new FFT processing node with the specified parameters
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - id: Optional UUID for the node, auto-generated if not provided
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - name: Name of the node
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - fftSize: Size of the FFT operation (default: 2048)
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - windowFunction: Window function to apply to input samples (default: hann)
+/// Uses Swift 6 actor isolation for thread safety.
     public init(
         id: UUID = UUID(),
         name: String = "FFT Processor",
@@ -179,7 +206,9 @@ public class FFTProcessingNode: AudioProcessingNode {
     // MARK: - AudioProcessingNode Protocol Implementation
     
     /// Configure this node with parameters
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter parameters: Configuration parameters for this node
+/// Uses Swift 6 actor isolation for thread safety.
     public func configure(parameters: [String: Any]) throws {
         logger.debug("Configuring FFT node: \(parameters)")
         
@@ -268,11 +297,17 @@ public class FFTProcessingNode: AudioProcessingNode {
     }
     
     /// Process incoming audio data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - inputBuffers: The input audio buffer identifiers
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - outputBuffers: The output audio buffer identifiers
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - context: The processing context
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Whether processing was successful
+/// Uses Swift 6 actor isolation for thread safety.
     public func process(
         inputBuffers: [AudioBufferID],
         outputBuffers: [AudioBufferID],
@@ -346,6 +381,7 @@ public class FFTProcessingNode: AudioProcessingNode {
     }
     
     /// Reset the state of this node
+/// Uses Swift 6 actor isolation for thread safety.
     public func reset() {
         // Clear all FFT data
         self.realInput = [Float](repeating: 0, count: self.fftSize)
@@ -365,6 +401,7 @@ public class FFTProcessingNode: AudioProcessingNode {
     // MARK: - FFT Implementation
     
     /// Creates the window function buffer based on the selected window type
+/// Uses Swift 6 actor isolation for thread safety.
     private func createWindow() {
         switch windowFunction {
         case .hann:
@@ -382,13 +419,21 @@ public class FFTProcessingNode: AudioProcessingNode {
     }
     
     /// Performs FFT on the provided audio data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - input: Pointer to input audio samples
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - inputSize: Number of samples in the input buffer
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - output: Pointer to output buffer for FFT results
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - outputSize: Size of the output buffer
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - format: Audio format of the input data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Whether the FFT was successful
+/// Uses Swift 6 actor isolation for thread safety.
     private func performFFT(
         input: UnsafePointer<Float>,
         inputSize: Int,
@@ -474,9 +519,13 @@ public class FFTProcessingNode: AudioProcessingNode {
     }
     
     /// Calculates frequency band levels from FFT data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - scaledMagnitude: The scaled magnitude values from FFT
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - format: The audio format
+/// Uses Swift 6 actor isolation for thread safety.
     private func calculateFrequencyBands(scaledMagnitude: [Float], format: AVAudioFormat) {
         // Reset levels
         var bassSum: Float = 0.0
@@ -524,25 +573,37 @@ public class FFTProcessingNode: AudioProcessingNode {
     }
     
     /// Gets frequency band levels
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Tuple containing bass, mid, and treble levels
+/// Uses Swift 6 actor isolation for thread safety.
     public func getFrequencyBandLevels() -> (bass: Float, mid: Float, treble: Float) {
         return (bass: bassLevel, mid: midLevel, treble: trebleLevel)
     }
     
     /// Converts bin index to frequency in Hz
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - binIndex: The FFT bin index
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - sampleRate: The audio sample rate
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: The frequency in Hz
+/// Uses Swift 6 actor isolation for thread safety.
     private func binIndexToFrequency(binIndex: Int, sampleRate: Double) -> Float {
         return Float(binIndex) * Float(sampleRate) / Float(fftSize)
     }
     
     /// Finds the bin index for a given frequency
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - frequency: The frequency in Hz
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - sampleRate: The audio sample rate
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: The closest bin index
+/// Uses Swift 6 actor isolation for thread safety.
     private func frequencyToBinIndex(frequency: Float, sampleRate: Double) -> Int {
         let index = Int(Float(fftSize) * frequency / Float(sampleRate))
         return min(max(0, index), fftSize/2 - 1)

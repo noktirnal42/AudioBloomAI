@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import Metal
 import MetalKit
@@ -801,7 +804,7 @@ public class MetalComputeCore {
 
 /// Parameters for FFT operations
 @available(macOS 15.0, *)
-struct FFTParameters {
+struct FFTParameters: Sendable {
     /// Number of samples to process
     let sampleCount: UInt32
     /// Offset in input buffer
@@ -814,7 +817,7 @@ struct FFTParameters {
 
 /// Parameters for filter operations
 @available(macOS 15.0, *)
-struct FilterParameters {
+struct FilterParameters: Sendable {
     /// Number of samples to process
     let sampleCount: UInt32
     /// Offset in input buffer
@@ -827,7 +830,7 @@ struct FilterParameters {
 
 /// Parameters for time domain filter operations
 @available(macOS 15.0, *)
-struct TimeFilterParameters {
+struct TimeFilterParameters: Sendable {
     /// Number of samples to process
     let sampleCount: UInt32
     /// Length of the filter
@@ -842,7 +845,7 @@ struct TimeFilterParameters {
 
 /// Parameters for spectrum analysis operations
 @available(macOS 15.0, *)
-struct SpectrumAnalysisParameters {
+struct SpectrumAnalysisParameters: Sendable {
     /// Number of spectrum samples
     let sampleCount: UInt32
     /// Sample rate in Hz
@@ -863,7 +866,7 @@ struct SpectrumAnalysisParameters {
 
 /// Parameters for normalization operations
 @available(macOS 15.0, *)
-struct NormalizeParameters {
+struct NormalizeParameters: Sendable {
     /// Number of samples to process
     let sampleCount: UInt32
     /// Target normalization level (0.0-1.0)
@@ -878,7 +881,7 @@ struct NormalizeParameters {
 
 /// Metrics for a compute operation
 @available(macOS 15.0, *)
-public struct OperationMetrics {
+public struct OperationMetrics: Sendable {
     /// Operation name
     public let name: String
     /// Duration in seconds
@@ -897,7 +900,8 @@ public struct OperationMetrics {
 @available(macOS 15.0, *)
 class PerformanceMonitor {
     /// Operation tracking information
-    private struct OperationInfo {
+    @available(macOS 15.0, *)
+    private struct OperationInfo: Sendable {
         /// Operation name
         let name: String
         /// Start time

@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 //
 // VisualTheme.swift
 // Visual theme definitions for AudioBloomAI
@@ -8,7 +11,8 @@ import SwiftUI
 
 public extension AudioBloomCore {
     /// Visual theme options for the application
-    enum VisualTheme: String, CaseIterable, Identifiable, Codable, Equatable {
+    @available(macOS 15.0, *)
+    enum VisualTheme: String, CaseIterable, Identifiable, Codable, Equatable, Sendable {
         /// Classic blue/purple theme
         case classic = "Classic"
         
@@ -221,7 +225,8 @@ public extension AudioBloomCore {
     }
     
     /// SwiftUI color collection for a theme
-    struct ThemeColors: Equatable {
+    @available(macOS 15.0, *)
+    struct ThemeColors: Sendable: Equatable {
         /// Primary color
         public let primary: Color
         

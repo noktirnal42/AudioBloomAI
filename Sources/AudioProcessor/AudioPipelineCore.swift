@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import AVFoundation
 import Metal
@@ -66,7 +69,7 @@ public protocol AudioStreamHandler: AnyObject {
 
 /// Audio stream status information
 @available(macOS 15.0, *)
-public struct AudioStreamStatus {
+public struct AudioStreamStatus: Sendable {
     /// Whether the stream is active
     public let isActive: Bool
     /// Current buffer utilization (0.0 - 1.0)
@@ -138,7 +141,7 @@ public enum AudioBufferType {
 
 /// Options for updating audio buffers
 @available(macOS 15.0, *)
-public struct AudioBufferUpdateOptions: OptionSet {
+public struct AudioBufferUpdateOptions: Sendable: OptionSet {
     public let rawValue: Int
     
     public init(rawValue: Int) {
@@ -155,7 +158,7 @@ public struct AudioBufferUpdateOptions: OptionSet {
 
 /// Type representing a buffer identifier
 @available(macOS 15.0, *)
-public struct AudioBufferID: Hashable, Equatable {
+public struct AudioBufferID: Sendable: Hashable, Equatable {
     public let id: UInt64
     
     public init(_ id: UInt64) {
@@ -199,7 +202,7 @@ public protocol AudioProcessingNode: AnyObject {
 
 /// IO requirements for an audio processing node
 @available(macOS 15.0, *)
-public struct AudioNodeIORequirements {
+public struct AudioNodeIORequirements: Sendable {
     /// Supported audio formats
     public let supportedFormats: [AVAudioFormat]
     /// Number of channels required/provided
@@ -210,7 +213,8 @@ public struct AudioNodeIORequirements {
     public let sampleRates: [Double]
     
     /// Value range for count-based requirements
-    public struct CountRange {
+    @available(macOS 15.0, *)
+    public struct CountRange: Sendable {
         // Check if any other nodes depend on this one
         for (otherNodeID, nodeConnections) in connections {
             for connection in nodeConnections {
@@ -489,7 +493,7 @@ public struct AudioNodeIORequirements {
 
 /// Configuration options for the audio pipeline
 @available(macOS 15.0, *)
-public struct AudioPipelineConfiguration {
+public struct AudioPipelineConfiguration: Sendable {
     /// Whether to enable Metal compute capabilities
     public let enableMetalCompute: Bool
     
@@ -683,7 +687,7 @@ public protocol AudioProcessingChain: AnyObject {
 
 /// Connection between audio processing nodes
 @available(macOS 15.0, *)
-public struct AudioNodeConnection: Hashable {
+public struct AudioNodeConnection: Sendable: Hashable {
     /// Source node ID
     public let sourceNodeID: UUID
     /// Source output index
@@ -722,7 +726,7 @@ public struct AudioNodeConnection: Hashable {
 
 /// Audio buffer representation
 @available(macOS 15.0, *)
-public struct AudioBuffer {
+public struct AudioBuffer: Sendable {
     /// The CPU-accessible pointer (if available)
     public let cpuBuffer: UnsafeMutableRawPointer?
     /// The Metal buffer (if available)

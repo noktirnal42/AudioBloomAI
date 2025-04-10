@@ -11,44 +11,62 @@ import os.log
 #endif
 
 /// Audio Engine for capturing and processing audio data
-public class AudioEngine: ObservableObject, AudioDataProvider {
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
+public actor AudioEngine: ObservableObject, AudioDataProvider  {
+    // Converted to actor in Swift 6 for thread safety
     /// Published audio levels for the left and right channels
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var levels: (left: Float, right: Float) = (0, 0)
     
     /// Published frequency data from FFT analysis
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var frequencyData: [Float] = []
     
     /// Available audio input devices
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var availableInputDevices: [AudioDevice] = []
     
     /// Available audio output devices
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var availableOutputDevices: [AudioDevice] = []
     
     /// Currently selected audio input device
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var selectedInputDevice: AudioDevice?
     
     /// Currently selected audio output device
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var selectedOutputDevice: AudioDevice?
     
     /// Currently active audio source
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var activeAudioSource: AudioSourceType = .microphone
     
     /// Audio data publisher for subscribers
+/// Uses Swift 6 actor isolation for thread safety.
     /// Audio data publisher for subscribers
+/// Uses Swift 6 actor isolation for thread safety.
     private let audioDataPublisher = AudioDataPublisher()
     
     /// The AVAudioEngine instance for audio processing
+/// Uses Swift 6 actor isolation for thread safety.
     private let avAudioEngine = AVAudioEngine()
     
     /// The AVAudioEngine instance for system audio (if available)
+/// Uses Swift 6 actor isolation for thread safety.
     private let systemAudioEngine = AVAudioEngine()
     
     /// FFT helper for frequency analysis
+/// Uses Swift 6 actor isolation for thread safety.
     private var fftHelper: FFTHelper?
     
     /// Logger for audio processing
+/// Uses Swift 6 actor isolation for thread safety.
     private let logger = Logger(subsystem: "com.audiobloom.audioprocessor", category: "AudioEngine")
     /// Types of audio sources
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
     public enum AudioSourceType: String, CaseIterable, Identifiable {
         case microphone = "Microphone"
         case systemAudio = "System Audio"
@@ -58,41 +76,56 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Audio device configuration
-    public struct AudioConfiguration {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct AudioConfiguration: Sendable {
         /// Whether to enable system audio capture
+/// Uses Swift 6 actor isolation for thread safety.
         public var enableSystemAudioCapture: Bool = true
         
         /// Whether to use custom audio device selection
+/// Uses Swift 6 actor isolation for thread safety.
         public var useCustomAudioDevice: Bool = false
         
         /// Volume level for microphone input (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public var microphoneVolume: Float = 1.0
         
         /// Volume level for system audio input (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public var systemAudioVolume: Float = 1.0
         
         /// Whether to mix inputs or use only selected source
+/// Uses Swift 6 actor isolation for thread safety.
         public var mixInputs: Bool = false
     }
     
     /// Audio device model
-    public struct AudioDevice: Identifiable, Hashable {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct AudioDevice: Sendable: Identifiable, Hashable {
         /// Unique identifier for the device
+/// Uses Swift 6 actor isolation for thread safety.
         public let id: String
         
         /// Human-readable name of the device
+/// Uses Swift 6 actor isolation for thread safety.
         public let name: String
         
         /// Device manufacturer
+/// Uses Swift 6 actor isolation for thread safety.
         public let manufacturer: String
         
         /// Whether this is an input device
+/// Uses Swift 6 actor isolation for thread safety.
         public let isInput: Bool
         
         /// Sample rate of the device
+/// Uses Swift 6 actor isolation for thread safety.
         public let sampleRate: Double
         
         /// Number of audio channels
+/// Uses Swift 6 actor isolation for thread safety.
         public let channelCount: Int
         
         public var description: String {
@@ -109,28 +142,36 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Audio tap node for extracting audio data
+/// Uses Swift 6 actor isolation for thread safety.
     private var audioTap: AVAudioNode?
     
     /// Current audio configuration
+/// Uses Swift 6 actor isolation for thread safety.
     private var audioConfig = AudioConfiguration()
     
     /// System audio capture node (implementation depends on platform)
+/// Uses Swift 6 actor isolation for thread safety.
     private var systemAudioNode: AVAudioNode?
     
     /// Audio mixer for routing between sources
+/// Uses Swift 6 actor isolation for thread safety.
     private var mainMixer: AVAudioMixerNode?
     
     /// Audio device observer
+/// Uses Swift 6 actor isolation for thread safety.
     private var deviceObserver: Any?
     
     /// Processing queue for audio analysis
+/// Uses Swift 6 actor isolation for thread safety.
     private let processingQueue = DispatchQueue(label: "com.audiobloom.audioprocessing", qos: .userInteractive)
     
     
     /// Timer for polling audio data
+/// Uses Swift 6 actor isolation for thread safety.
     private var audioPollingTimer: Timer?
     
     /// Flag indicating if the audio engine is running
+/// Uses Swift 6 actor isolation for thread safety.
     private var isRunning = false
     public init() {
         // Initialize with default FFT size
@@ -191,9 +232,13 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     // MARK: - Device Selection
     
     /// Sets the active audio device
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - device: The audio device to activate
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - reconfigureAudio: Whether to reconfigure the audio engine immediately
+/// Uses Swift 6 actor isolation for thread safety.
     public func setActiveDevice(_ device: AudioDevice, reconfigureAudio: Bool = true) {
         if device.isInput {
             // If we're changing input device
@@ -227,7 +272,9 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Sets the active audio source type
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter sourceType: The audio source type to activate
+/// Uses Swift 6 actor isolation for thread safety.
     public func setAudioSource(_ sourceType: AudioSourceType) {
         guard activeAudioSource != sourceType else { return }
         
@@ -266,9 +313,13 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Adjusts volume levels for audio sources
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - micVolume: Microphone volume (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - systemVolume: System audio volume (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
     public func adjustVolumes(micVolume: Float, systemVolume: Float) {
         audioConfig.microphoneVolume = max(0, min(1, micVolume))
         audioConfig.systemAudioVolume = max(0, min(1, systemVolume))
@@ -287,9 +338,13 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     
     #if os(macOS)
     /// Sets the audio device for the system
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - id: Device ID
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - isInput: Whether this is an input device
+/// Uses Swift 6 actor isolation for thread safety.
     private func setAudioDevice(id: String, isInput: Bool) {
         // On macOS, changing audio devices requires working with Core Audio
         // This is a simplified implementation
@@ -321,13 +376,19 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     
     // MARK: - System Audio Capture
     /// Sets up system audio capture on macOS
+/// Uses Swift 6 actor isolation for thread safety.
     /// 
     /// This method configures the capture of system audio using macOS audio APIs.
+/// Uses Swift 6 actor isolation for thread safety.
     /// It uses AVCaptureSession to capture system audio output and routes it to the
+/// Uses Swift 6 actor isolation for thread safety.
     /// AVAudioEngine for processing. This implementation requires user permission
+/// Uses Swift 6 actor isolation for thread safety.
     /// to access screen recording (which includes system audio capture capability).
+/// Uses Swift 6 actor isolation for thread safety.
     ///
     /// - Throws: AudioBloomCore.Error.systemAudioCaptureSetupFailed if setup fails
+/// Uses Swift 6 actor isolation for thread safety.
     private func setupSystemAudioCapture() throws {
         #if os(macOS)
         logger.info("Setting up system audio capture")
@@ -457,10 +518,12 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Returns an audio data publisher for subscribers
+/// Uses Swift 6 actor isolation for thread safety.
     public func getAudioDataPublisher() -> AudioDataPublisher {
         return audioDataPublisher
     }
     /// Sets up the audio session for capturing audio
+/// Uses Swift 6 actor isolation for thread safety.
     public func setupAudioSession() async throws {
         #if os(iOS) || os(tvOS) || os(watchOS)
         // iOS devices need to configure AVAudioSession
@@ -488,13 +551,19 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Starts audio capture
+/// Uses Swift 6 actor isolation for thread safety.
     /// Starts audio capture
+/// Uses Swift 6 actor isolation for thread safety.
     /// 
     /// This method starts the AVAudioEngine and begins the audio capture process.
+/// Uses Swift 6 actor isolation for thread safety.
     /// It sets up all necessary components for audio processing and starts the
+/// Uses Swift 6 actor isolation for thread safety.
     /// audio polling timer.
+/// Uses Swift 6 actor isolation for thread safety.
     ///
     /// - Throws: AudioBloomCore.Error.audioEngineStartFailed if the audio engine fails to start
+/// Uses Swift 6 actor isolation for thread safety.
     public func startCapture() throws {
         guard !isRunning else { 
             logger.notice("Audio capture already running, ignoring start request")
@@ -517,9 +586,12 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
         }
     }
     /// Stops audio capture
+/// Uses Swift 6 actor isolation for thread safety.
     /// 
     /// This method stops the AVAudioEngine and ends the audio capture process.
+/// Uses Swift 6 actor isolation for thread safety.
     /// It cleans up all running audio components and stops the audio polling timer.
+/// Uses Swift 6 actor isolation for thread safety.
     public func stopCapture() {
         guard isRunning else {
             logger.notice("Audio capture not running, ignoring stop request")
@@ -540,6 +612,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Configures the audio engine components
+/// Uses Swift 6 actor isolation for thread safety.
     private func configureAudioEngine() {
         // Reset the engine
         avAudioEngine.stop()
@@ -574,6 +647,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Configures the microphone input
+/// Uses Swift 6 actor isolation for thread safety.
     private func configureMicrophoneInput(mixerNode: AVAudioMixerNode) {
         let inputNode = avAudioEngine.inputNode
         
@@ -591,6 +665,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Processes audio buffer data
+/// Uses Swift 6 actor isolation for thread safety.
     private func processAudioBuffer(_ buffer: AVAudioPCMBuffer) {
         guard let fftHelper = fftHelper,
               let channelData = buffer.floatChannelData else { return }
@@ -613,7 +688,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
         let fftData = fftHelper.performFFT(data: leftChannelData)
         
         // Update published values on main thread
-        DispatchQueue.main.async { [weak self] in
+        Task { @MainActor in [weak self] in
             self?.levels = (left: leftLevel, right: rightLevel)
             self?.frequencyData = fftData
             
@@ -623,6 +698,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Calculates RMS (Root Mean Square) level from audio sample data
+/// Uses Swift 6 actor isolation for thread safety.
     private func calculateRMSLevel(data: [Float]) -> Float {
         // Use Accelerate framework for efficient RMS calculation
         var rms: Float = 0.0
@@ -641,6 +717,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Starts the audio polling timer
+/// Uses Swift 6 actor isolation for thread safety.
     private func startAudioPolling() {
         audioPollingTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / Double(AudioBloomCore.Constants.defaultFrameRate), repeats: true) { [weak self] _ in
             // This timer ensures we're regularly checking for audio data
@@ -653,7 +730,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
             if self.isRunning && self.avAudioEngine.isRunning {
                 // Only update UI if we don't have recent data
                 if self.frequencyData.isEmpty {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         self.levels = (left: 0, right: 0)
                         self.frequencyData = [Float](repeating: 0, count: AudioBloomCore.Constants.defaultFFTSize / 2)
                         
@@ -669,12 +746,14 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Stops the audio polling timer
+/// Uses Swift 6 actor isolation for thread safety.
     private func stopAudioPolling() {
         audioPollingTimer?.invalidate()
         audioPollingTimer = nil
     }
     
     /// Handles audio engine configuration changes
+/// Uses Swift 6 actor isolation for thread safety.
     @objc private func handleAudioEngineInterruption(_ notification: Notification) {
         // This is called when audio configuration changes (like unplugging a device)
         if !avAudioEngine.isRunning && isRunning {
@@ -694,6 +773,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     // MARK: - Device Management
     
     /// Refreshes the list of available audio devices
+/// Uses Swift 6 actor isolation for thread safety.
     @objc public func refreshAudioDevices() {
         #if os(macOS)
         // Get all audio devices on macOS
@@ -820,7 +900,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
         #endif
         
         // Update our published properties on the main thread
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.availableInputDevices = inputDevices
             self.availableOutputDevices = outputDevices
             
@@ -836,6 +916,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Cleanup resources when the object is deallocated
+/// Uses Swift 6 actor isolation for thread safety.
     deinit {
         // Stop capture if running
         if isRunning {
@@ -870,12 +951,15 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
 
     
     /// FFT setup for real signal
+/// Uses Swift 6 actor isolation for thread safety.
     private var fftSetup: vDSP_DFT_Setup?
     
     /// Window buffer for windowing the signal before FFT
+/// Uses Swift 6 actor isolation for thread safety.
     private var window: [Float]
     
     /// Temporary buffers for FFT computation
+/// Uses Swift 6 actor isolation for thread safety.
     private var realInput: [Float]
     private var imagInput: [Float]
     private var realOutput: [Float]
@@ -883,10 +967,12 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     private var magnitude: [Float]
     
     /// Real and imaginary pointers for DSPSplitComplex
+/// Uses Swift 6 actor isolation for thread safety.
     private var realPtr: UnsafeMutablePointer<Float>?
     private var imagPtr: UnsafeMutablePointer<Float>?
     
     /// Initializes with the specified FFT size
+/// Uses Swift 6 actor isolation for thread safety.
     init(fftSize: Int) {
         self.fftSize = fftSize
         
@@ -936,6 +1022,7 @@ public class AudioEngine: ObservableObject, AudioDataProvider {
     }
     
     /// Performs FFT on the provided audio data
+/// Uses Swift 6 actor isolation for thread safety.
     func performFFT(data: [Float]) -> [Float] {
         guard let fftSetup = fftSetup,
               let realPtr = realPtr,

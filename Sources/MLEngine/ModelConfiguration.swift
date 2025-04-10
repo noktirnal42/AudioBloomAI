@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import CoreML
 import Combine
@@ -5,6 +8,7 @@ import Logging
 import os.signpost
 
 /// Errors related to model configuration and optimization
+@available(macOS 15.0, *)
 public enum ModelConfigurationError: Error {
     case modelNotFound
     case compilationFailed(Error)
@@ -35,6 +39,7 @@ public enum ModelConfigurationError: Error {
 }
 
 /// Performance optimization level
+@available(macOS 15.0, *)
 public enum OptimizationLevel {
     /// Maximize quality, potentially at the cost of performance
     case quality
@@ -47,7 +52,8 @@ public enum OptimizationLevel {
 }
 
 /// Neural Engine specific capabilities
-public struct NeuralEngineCapabilities {
+@available(macOS 15.0, *)
+public struct NeuralEngineCapabilities: Sendable {
     /// Whether the Neural Engine is available
     public let isAvailable: Bool
     
@@ -82,6 +88,7 @@ public struct NeuralEngineCapabilities {
 }
 
 /// Handles CoreML model configuration and optimization for Neural Engine
+@available(macOS 15.0, *)
 public class ModelConfiguration {
     /// Logger for this class
     private let logger = Logger(label: "com.audiobloom.modelconfiguration")
@@ -350,7 +357,8 @@ public extension MLParameterKey {
 /// Extension to provide monitoring metrics for CoreML performance
 public extension ModelConfiguration {
     /// Performance metrics for a CoreML model
-    struct PerformanceMetrics {
+    @available(macOS 15.0, *)
+    struct PerformanceMetrics: Sendable {
         /// Time spent in Neural Engine (ms)
         public let neuralEngineTime: Double
         

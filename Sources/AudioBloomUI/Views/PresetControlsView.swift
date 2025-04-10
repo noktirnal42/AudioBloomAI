@@ -1,9 +1,13 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import SwiftUI
 import AudioBloomCore
 import Combine
 
 /// SwiftUI view for managing and applying visualization presets
-public struct PresetControlsView: View {
+@available(macOS 15.0, *)
+public struct PresetControlsView: Sendable: View {
     /// The preset manager to use
     @ObservedObject private var presetManager: PresetManager
     
@@ -152,7 +156,8 @@ public var body: some View {
                 
 
 /// View for creating a new preset
-struct NewPresetView: View {
+@available(macOS 15.0, *)
+struct NewPresetView: Sendable: View {
     @Binding var presetName: String
     @Binding var presetDescription: String
     
@@ -195,7 +200,8 @@ struct NewPresetView: View {
 }
 
 /// View for editing an existing preset
-struct EditPresetView: View {
+@available(macOS 15.0, *)
+struct EditPresetView: Sendable: View {
     let preset: Preset
     let onSave: (Preset) -> Void
     let onCancel: () -> Void
@@ -272,7 +278,8 @@ struct EditPresetView: View {
 }
 
 /// View for importing presets
-struct ImportPresetsView: View {
+@available(macOS 15.0, *)
+struct ImportPresetsView: Sendable: View {
     let presetManager: PresetManager
     
     @State private var selectedURL: URL?
@@ -831,7 +838,8 @@ struct ImportPresetsView: View {
 }
 
 /// Individual preset item in the list
-private struct PresetItemView: View {
+@available(macOS 15.0, *)
+private struct PresetItemView: Sendable: View {
     let preset: Preset
     let isSelected: Bool
     let onSelect: () -> Void
@@ -963,7 +971,8 @@ private struct PresetItemView: View {
 }
 
 /// Preset tag view for displaying categories and attributes
-private struct PresetTagView: View {
+@available(macOS 15.0, *)
+private struct PresetTagView: Sendable: View {
     let text: String
     let color: Color
     
@@ -979,7 +988,8 @@ private struct PresetTagView: View {
 }
 
 /// Empty state view for when no presets are available
-private struct EmptyPresetsView: View {
+@available(macOS 15.0, *)
+private struct EmptyPresetsView: Sendable: View {
     let onCreateNew: () -> Void
     
     var body: some View {

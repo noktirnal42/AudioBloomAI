@@ -1,9 +1,13 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import AVFoundation
 import Combine
 import AudioBloomCore
 
 /// Bridge connecting AudioEngine and MLProcessor
+@available(macOS 15.0, *)
 public class AudioBridge: ObservableObject {
     /// The ML processor for audio analysis
     private let mlProcessor: MLProcessor
@@ -102,7 +106,7 @@ public class AudioBridge: ObservableObject {
     }
     
     /// Prepares the ML processor
-    private func prepareMLProcessor() {
+    private func prepareMLProcessor() async {
         Task {
             do {
                 // Create a standard audio format for ML processing
@@ -150,7 +154,9 @@ public class AudioBridge: ObservableObject {
     }
 }
 
+@available(macOS 15.0, *)
 /// Utility class for converting between audio data formats
+@available(macOS 15.0, *)
 private class FormatConverter {
     /// Converts frequency data to a format suitable for ML processing
     /// - Parameters:

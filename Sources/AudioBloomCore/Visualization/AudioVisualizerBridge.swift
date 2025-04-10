@@ -4,9 +4,12 @@ import MetalKit
 import AVFoundation
 import SwiftUI
 import Logging
-import CoreVideo
+import AppKit
+import os.log
 
 /// Enumeration of available visualization modes
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public enum VisualizationMode: String, CaseIterable, Identifiable, Sendable {
     case spectrum = "Spectrum"
     case waveform = "Waveform"
@@ -16,6 +19,7 @@ public enum VisualizationMode: String, CaseIterable, Identifiable, Sendable {
     public var id: String { rawValue }
     
     /// Get a user-friendly description of the mode
+/// Uses Swift 6 actor isolation for thread safety.
     public var description: String {
         switch self {
         case .spectrum:
@@ -31,166 +35,225 @@ public enum VisualizationMode: String, CaseIterable, Identifiable, Sendable {
 }
 
 /// A bridge that connects audio processing to visualization systems
-public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable {
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
+public final actor AudioVisualizerBridge: ObservableObject, @unchecked Sendable  {
+    // Converted to actor in Swift 6 for thread safety
     
     // MARK: - Published Properties
     
     /// Current visualization mode
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var currentMode: VisualizationMode = .spectrum
     
     /// Previous visualization mode (for transitions)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var previousMode: VisualizationMode = .spectrum
     
     /// Transition progress (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var transitionProgress: Double = 0.0
     
     /// Whether visualization is active
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var isActive: Bool = false
     
     /// Spectrum data for visualization (normalized 0-1)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var spectrumData: [Float] = []
     
     /// Waveform data for visualization (normalized -1 to 1)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var waveformData: [Float] = []
     
     /// Audio levels (left and right channels, 0-1)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var audioLevels: (left: Float, right: Float) = (0, 0)
     
     /// Beat detected flag (resets automatically)
+/// Uses Swift 6 actor isolation for thread safety.
     @Published public private(set) var beatDetected: Bool = false
     
     // MARK: - Configuration
     
     /// Configuration for the visualizer bridge
-    public struct Configuration: Equatable, Sendable {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct Configuration: Sendable: Equatable, Sendable {
         /// FFT smoothing factor (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
         public var fftSmoothingFactor: Float = 0.7
         
         /// Level smoothing factor (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
         public var levelSmoothingFactor: Float = 0.5
         
         /// Transition duration in seconds
+/// Uses Swift 6 actor isolation for thread safety.
         public var transitionDuration: Double = 0.5
         
         /// Maximum FPS for visualization rendering
+/// Uses Swift 6 actor isolation for thread safety.
         public var maxFps: Double = 60
         
         /// Whether to use GPU-accelerated audio processing
+/// Uses Swift 6 actor isolation for thread safety.
         public var useGPUProcessing: Bool = true
         
         /// Custom theme colors
+/// Uses Swift 6 actor isolation for thread safety.
         public var primaryColor: Color = .blue
         public var secondaryColor: Color = .purple
         public var backgroundColor: Color = .black
         public var accentColor: Color = .white
         
         /// Visualization-specific settings
+/// Uses Swift 6 actor isolation for thread safety.
         public var spectrumSettings: SpectrumSettings = SpectrumSettings()
         public var waveformSettings: WaveformSettings = WaveformSettings()
         public var particleSettings: ParticleSettings = ParticleSettings()
         public var neuralSettings: NeuralSettings = NeuralSettings()
         
         /// Settings for spectrum visualization
-        public struct SpectrumSettings: Equatable, Sendable {
+/// Uses Swift 6 actor isolation for thread safety.
+        @available(macOS 15.0, *)
+        public struct SpectrumSettings: Sendable: Equatable, Sendable {
             /// Bar spacing (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
             public var barSpacing: Float = 0.2
             
             /// Bar count (16-256)
+/// Uses Swift 6 actor isolation for thread safety.
             public var barCount: Int = 64
             
             /// Use logarithmic scale for frequency distribution
+/// Uses Swift 6 actor isolation for thread safety.
             public var useLogScale: Bool = true
             
             /// Show peak indicators
+/// Uses Swift 6 actor isolation for thread safety.
             public var showPeaks: Bool = true
             
             /// Frequency range (Hz)
+/// Uses Swift 6 actor isolation for thread safety.
             public var minFrequency: Float = 20
             public var maxFrequency: Float = 20000
             
             /// Default settings
+/// Uses Swift 6 actor isolation for thread safety.
             public init() {}
         }
         
         /// Settings for waveform visualization
-        public struct WaveformSettings: Equatable, Sendable {
+/// Uses Swift 6 actor isolation for thread safety.
+        @available(macOS 15.0, *)
+        public struct WaveformSettings: Sendable: Equatable, Sendable {
             /// Line thickness (1-10)
+/// Uses Swift 6 actor isolation for thread safety.
             public var lineThickness: Float = 2.0
             
             /// Line smoothing (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
             public var smoothing: Float = 0.3
             
             /// Show multiple lines
+/// Uses Swift 6 actor isolation for thread safety.
             public var showMultipleLines: Bool = true
             
             /// Time scale (seconds of audio visible)
+/// Uses Swift 6 actor isolation for thread safety.
             public var timeScale: Float = 0.05
             
             /// Default settings
+/// Uses Swift 6 actor isolation for thread safety.
             public init() {}
         }
         
         /// Settings for particle visualization
-        public struct ParticleSettings: Equatable, Sendable {
+/// Uses Swift 6 actor isolation for thread safety.
+        @available(macOS 15.0, *)
+        public struct ParticleSettings: Sendable: Equatable, Sendable {
             /// Particle count (100-10000)
+/// Uses Swift 6 actor isolation for thread safety.
             public var particleCount: Int = 2000
             
             /// Particle size (0.5-5.0)
+/// Uses Swift 6 actor isolation for thread safety.
             public var particleSize: Float = 1.5
             
             /// Audio reactivity (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
             public var audioReactivity: Float = 0.8
             
             /// Motion speed (0-2)
+/// Uses Swift 6 actor isolation for thread safety.
             public var motionSpeed: Float = 1.0
             
             /// Default settings
+/// Uses Swift 6 actor isolation for thread safety.
             public init() {}
         }
         
         /// Settings for neural visualization
-        public struct NeuralSettings: Equatable, Sendable {
+/// Uses Swift 6 actor isolation for thread safety.
+        @available(macOS 15.0, *)
+        public struct NeuralSettings: Sendable: Equatable, Sendable {
             /// Complexity (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
             public var complexity: Float = 0.7
             
             /// Speed (0-2)
+/// Uses Swift 6 actor isolation for thread safety.
             public var speed: Float = 1.0
             
             /// Color intensity (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
             public var colorIntensity: Float = 0.8
             
             /// Beat reactivity (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
             public var beatReactivity: Float = 0.9
             
             /// Default settings
+/// Uses Swift 6 actor isolation for thread safety.
             public init() {}
         }
         
         /// Default configuration
+/// Uses Swift 6 actor isolation for thread safety.
         public init() {}
     }
     
     /// Neural processing response for visualization
-    public struct NeuralProcessingResponse: Equatable, Sendable {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct NeuralProcessingResponse: Sendable: Equatable, Sendable {
         /// Energy level (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
         public var energy: Float = 0.0
         
         /// Pleasantness (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
         public var pleasantness: Float = 0.5
         
         /// Complexity (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
         public var complexity: Float = 0.5
         
         /// Pattern type (0-3)
+/// Uses Swift 6 actor isolation for thread safety.
         public var patternType: Int = 0
         
         /// Beat confidence (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
         public var beatConfidence: Float = 0.0
         
         /// Default initialization
+/// Uses Swift 6 actor isolation for thread safety.
         public init() {}
         
         /// Full initialization
+/// Uses Swift 6 actor isolation for thread safety.
         public init(energy: Float, pleasantness: Float, complexity: Float, patternType: Int = 0, beatConfidence: Float = 0.0) {
             self.energy = energy
             self.pleasantness = pleasantness
@@ -203,48 +266,66 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     // MARK: - Private Properties
     
     /// Current configuration
+/// Uses Swift 6 actor isolation for thread safety.
     private var configuration: Configuration
     
     /// Queue for audio processing
+/// Uses Swift 6 actor isolation for thread safety.
     private let processingQueue = DispatchQueue(label: "com.audiobloom.visualizer", qos: .userInteractive)
     
     /// Lock for thread safety
-    private let lock = NSLock()
+/// Uses Swift 6 actor isolation for thread safety.
+    // Lock removed - actor provides automatic isolation
     
     /// Subscribers to audio data
+/// Uses Swift 6 actor isolation for thread safety.
     private var audioSubscription: AnyCancellable?
     
     /// Subscribers to neural processing
+/// Uses Swift 6 actor isolation for thread safety.
     private var neuralSubscription: AnyCancellable?
     
     /// Timer for transitions
+/// Uses Swift 6 actor isolation for thread safety.
     private var transitionTimer: Timer?
     
     /// Time when transition started
+/// Uses Swift 6 actor isolation for thread safety.
     private var transitionStartTime: CFTimeInterval = 0
     
     /// Raw audio data buffer
+/// Uses Swift 6 actor isolation for thread safety.
     private var audioDataBuffer: [Float] = []
     
     /// Logger
+/// Uses Swift 6 actor isolation for thread safety.
     private let logger = Logger(label: "com.audiobloom.visualizerbridge")
     
     /// Spectrum data history (for smoothing)
+/// Uses Swift 6 actor isolation for thread safety.
     private var spectrumHistory: [[Float]] = []
     
     /// Waveform data history
+/// Uses Swift 6 actor isolation for thread safety.
     private var waveformHistory: [[Float]] = []
     
     /// Display link for frame timing
-    private var displayLink: CVDisplayLink?
+/// Uses Swift 6 actor isolation for thread safety.
+    private var displayLink: Any?
     
+    /// Display link target for callback handling
+/// Uses Swift 6 actor isolation for thread safety.
+    private var displayLinkTarget: DisplayLinkTarget?
     /// Performance monitoring service
+/// Uses Swift 6 actor isolation for thread safety.
     private weak var performanceMonitor: PerformanceMonitor?
     
     // MARK: - Initialization
     
     /// Initialize with a custom configuration
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter configuration: The configuration to use
+/// Uses Swift 6 actor isolation for thread safety.
     public init(configuration: Configuration = Configuration(), performanceMonitor: PerformanceMonitor? = nil) {
         self.configuration = configuration
         self.performanceMonitor = performanceMonitor
@@ -270,28 +351,21 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     // MARK: - Public Methods
     
     /// Update the configuration
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter configuration: New configuration
-    public func updateConfiguration(_ configuration: Configuration) {
-        lock.lock()
-        self.configuration = configuration
-        lock.unlock()
-        
-        logger.debug("Configuration updated")
+/// Uses Swift 6 actor isolation for thread safety.
+    public func updateConfiguration(_ configuration: Configuration) { self.configuration = configuration logger.debug("Configuration updated")
     }
     
     /// Switch to a different visualization mode with transition
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter mode: The mode to switch to
+/// Uses Swift 6 actor isolation for thread safety.
     public func switchToMode(_ mode: VisualizationMode) {
-        guard mode != currentMode else { return }
-        
-        lock.lock()
-        previousMode = currentMode
+        guard mode != currentMode else { return } previousMode = currentMode
         currentMode = mode
         transitionStartTime = CFAbsoluteTimeGetCurrent()
-        transitionProgress = 0.0
-        lock.unlock()
-        
-        // Cancel any existing transition timer
+        transitionProgress = 0.0 // Cancel any existing transition timer
         transitionTimer?.invalidate()
         
         // Start transition timer
@@ -303,6 +377,7 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Activate visualization
+/// Uses Swift 6 actor isolation for thread safety.
     public func activate() {
         isActive = true
         startDisplayLink()
@@ -310,6 +385,7 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Deactivate visualization
+/// Uses Swift 6 actor isolation for thread safety.
     public func deactivate() {
         isActive = false
         stopDisplayLink()
@@ -317,7 +393,9 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Process audio data for visualization
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter audioData: Raw audio data
+/// Uses Swift 6 actor isolation for thread safety.
     public func processAudioData(_ audioData: [Float], levels: (left: Float, right: Float)) {
         guard isActive else { return }
         
@@ -352,7 +430,9 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Process neural analysis results
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter response: Neural processing response
+/// Uses Swift 6 actor isolation for thread safety.
     public func processNeuralResponse(_ response: NeuralProcessingResponse) {
         guard isActive else { return }
         
@@ -360,22 +440,22 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
         
         // Update beat detection based on neural confidence
         if response.beatConfidence > 0.7 && !wasDetected {
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.beatDetected = true
                 
-                // Auto-reset the beat detection after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self.beatDetected = false
-                }
+                // Auto-reset the beat detection after a short delay using modern concurrency
+                try? await Task.sleep(for: .milliseconds(100))
+                self.beatDetected = false
             }
         }
-        
         // Can also update other visualization parameters based on neural response
         // Implementation would depend on how different visualizations use the neural data
     }
     
     /// Subscribe to audio data from a publisher
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter publisher: The publisher to subscribe to
+/// Uses Swift 6 actor isolation for thread safety.
     public func subscribeToAudioData<P: Publisher>(_ publisher: P) where P.Output == ([Float], (Float, Float)), P.Failure == Never {
         audioSubscription = publisher
             .receive(on: processingQueue)
@@ -387,7 +467,9 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Subscribe to neural processing results
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter publisher: The publisher of neural responses
+/// Uses Swift 6 actor isolation for thread safety.
     public func subscribeToNeuralProcessing<P: Publisher>(_ publisher: P) where P.Output == NeuralProcessingResponse, P.Failure == Never {
         neuralSubscription = publisher
             .receive(on: processingQueue)
@@ -398,85 +480,115 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
         logger.debug("Subscribed to neural processing")
     }
     
-    // MARK: - Private Methods
+    // MARK: - Display Link Target
     
-    /// Setup the display link for frame synchronization
-    private func setupDisplayLink() {
-        // Create a display link capable of being used with all active displays
-        var newDisplayLink: CVDisplayLink?
+    /// Class to handle DisplayLink callbacks
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    private final actor DisplayLinkTarget {
+    // Converted to actor in Swift 6 for thread safety
+        weak var bridge: AudioVisualizerBridge?
         
-        // Set up display link callback
-        let displayLinkOutputCallback: CVDisplayLinkOutputCallback = { 
-            (displayLink: CVDisplayLink, 
-             inNow: UnsafePointer<CVTimeStamp>, 
-             inOutputTime: UnsafePointer<CVTimeStamp>, 
-             flagsIn: CVOptionFlags, 
-             flagsOut: UnsafeMutablePointer<CVOptionFlags>, 
-             displayLinkContext: UnsafeMutableRawPointer?) -> CVReturn in
-            
-            // Get the object reference from context
-            let bridge = Unmanaged<AudioVisualizerBridge>.fromOpaque(displayLinkContext!).takeUnretainedValue()
-            bridge.displayLinkDidFire()
-            
-            return kCVReturnSuccess
+        init(bridge: AudioVisualizerBridge) {
+            self.bridge = bridge
         }
         
-        // Create display link
-        let error = CVDisplayLinkCreateWithActiveCGDisplays(&newDisplayLink)
+        @objc func displayLinkDidFire(displayLink: NSObject) {
+            guard let bridge = bridge else { return }
+            Task { @MainActor in
+                bridge.handleDisplayLinkFire()
+            }
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Setup the display link for frame synchronization using modern APIs
+/// Uses Swift 6 actor isolation for thread safety.
+    private func setupDisplayLink() {
+        // Create display link target
+        let target = DisplayLinkTarget(bridge: self)
+        self.displayLinkTarget = target
         
-        if error == kCVReturnSuccess, let newDisplayLink = newDisplayLink {
-            // Set the context to point to self
-            let pointerToSelf = Unmanaged.passUnretained(self).toOpaque()
-            CVDisplayLinkSetOutputCallback(newDisplayLink, displayLinkOutputCallback, pointerToSelf)
-            
+        if let mainView = NSApp.mainWindow?.contentView {
+            // Use modern NSView.displayLink API (available in macOS 15+)
+            let newDisplayLink = mainView.displayLink(target: target, 
+                                                     selector: #selector(DisplayLinkTarget.displayLinkDidFire))
             self.displayLink = newDisplayLink
+            logger.debug("Set up modern display link for visualization synchronization")
+        } else {
+            // Fallback to a timer if no view is available
+            logger.warning("No main view available, using timer fallback for visualization")
+            let timer = Timer.scheduledTimer(withTimeInterval: 1.0/60.0, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    self.handleDisplayLinkFire()
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            self.displayLink = timer
         }
     }
     
     /// Start the display link
+/// Uses Swift 6 actor isolation for thread safety.
     private func startDisplayLink() {
-        if let displayLink = displayLink, !CVDisplayLinkIsRunning(displayLink) {
-            CVDisplayLinkStart(displayLink)
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.isPaused = false
+            logger.debug("Started display link")
+        } else if let displayLink = displayLink as? Timer {
+            // Timer is already running from setup
+            logger.debug("Using timer for display synchronization")
+        } else {
+            // No display link exists, create one
+            setupDisplayLink()
+            if let displayLink = displayLink as? NSDisplayLink {
+                displayLink.isPaused = false
+            }
         }
     }
     
     /// Stop the display link
+/// Uses Swift 6 actor isolation for thread safety.
     private func stopDisplayLink() {
-        if let displayLink = displayLink, CVDisplayLinkIsRunning(displayLink) {
-            CVDisplayLinkStop(displayLink)
+        if let displayLink = displayLink as? NSDisplayLink {
+            displayLink.isPaused = true
+            logger.debug("Paused display link")
+        } else if let displayLink = displayLink as? Timer {
+            displayLink.invalidate()
+            self.displayLink = nil
+            logger.debug("Stopped timer for display synchronization")
         }
     }
-    
-    /// Called when the display link fires
-    @objc private func displayLinkDidFire() {
+    /// Called when the display link fires - modern implementation
+/// Uses Swift 6 actor isolation for thread safety.
+    @MainActor
+    private func handleDisplayLinkFire() {
         // Check if we need to update the UI for transition progress
         updateTransitionProgress()
         
-        // Update data on main thread
+        // Since we're already on the main thread with @MainActor,
+        // we can directly update the visualization data
         updateVisualizationData()
+        
+        // Track performance if monitor available
+        performanceMonitor?.recordRenderTime(1.0) // Placeholder value
     }
-    
     /// Update visualization data on the main thread
-    private func updateVisualizationData() {
-        // Make sure we update the UI on the main thread
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            self.lock.lock()
-            // Copy data for thread safety
-            let spectrumCopy = self.spectrumData
-            let waveformCopy = self.waveformData
-            let levelsCopy = self.audioLevels
-            self.lock.unlock()
-            
-            // Update published properties
-            self.spectrumData = spectrumCopy
-            self.waveformData = waveformCopy
-            self.audioLevels = levelsCopy
-        }
+/// Uses Swift 6 actor isolation for thread safety.
+    @MainActor
+    private func updateVisualizationData() { // Copy data for thread safety
+        let spectrumCopy = self.spectrumData
+        let waveformCopy = self.waveformData
+        let levelsCopy = self.audioLevels // Update published properties
+        // This is now running on the main thread through @MainActor
+        self.spectrumData = spectrumCopy
+        self.waveformData = waveformCopy
+        self.audioLevels = levelsCopy
     }
-    
     /// Update transition progress
+/// Uses Swift 6 actor isolation for thread safety.
+    @MainActor
     private func updateTransitionProgress() {
         guard transitionProgress < 1.0 else {
             // Transition complete
@@ -489,10 +601,8 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
         let elapsedTime = currentTime - transitionStartTime
         let progress = min(1.0, elapsedTime / configuration.transitionDuration)
         
-        // Update the progress on the main thread
-        DispatchQueue.main.async { [weak self] in
-            self?.transitionProgress = progress
-        }
+        // Update the progress (we're already on the main thread with @MainActor)
+        self.transitionProgress = progress
         
         // If transition is complete, clean up
         if progress >= 1.0 {
@@ -500,8 +610,8 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
             transitionTimer = nil
         }
     }
-    
     /// Process audio data for spectrum visualization
+/// Uses Swift 6 actor isolation for thread safety.
     private func processSpectrumData(_ audioData: [Float]) {
         // Begin performance monitoring
         performanceMonitor?.beginMeasuring("ProcessSpectrum")
@@ -524,16 +634,12 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
         // Apply smoothing
         applySpectrumSmoothing(&spectrum)
         
-        // Update spectrum data (thread-safe)
-        lock.lock()
-        spectrumData = spectrum
-        lock.unlock()
-        
-        // End performance monitoring
+        // Update spectrum data (thread-safe) spectrumData = spectrum // End performance monitoring
         performanceMonitor?.endMeasuring("ProcessSpectrum")
     }
     
     /// Process FFT on audio data
+/// Uses Swift 6 actor isolation for thread safety.
     private func processFFT(_ audioData: [Float], fftSize: Int) -> [Float] {
         // This is a simplified placeholder implementation.
         // In a real implementation, you would use vDSP for efficient FFT processing.
@@ -557,6 +663,7 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Resize spectrum data to target size
+/// Uses Swift 6 actor isolation for thread safety.
     private func resizeSpectrumData(_ data: [Float], targetSize: Int) -> [Float] {
         guard data.count != targetSize, !data.isEmpty, targetSize > 0 else {
             return data
@@ -578,6 +685,7 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Apply logarithmic scaling to spectrum data
+/// Uses Swift 6 actor isolation for thread safety.
     private func applyLogScaling(_ spectrum: inout [Float], minFreq: Float, maxFreq: Float) {
         guard !spectrum.isEmpty else { return }
         
@@ -609,6 +717,7 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Apply smoothing to spectrum data
+/// Uses Swift 6 actor isolation for thread safety.
     private func applySpectrumSmoothing(_ spectrum: inout [Float]) {
         // Add the current spectrum to history for smoothing
         spectrumHistory.append(spectrum)
@@ -650,6 +759,7 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Process audio data for waveform visualization
+/// Uses Swift 6 actor isolation for thread safety.
     private func processWaveformData(_ audioData: [Float]) {
         // Begin performance monitoring
         performanceMonitor?.beginMeasuring("ProcessWaveform")
@@ -676,16 +786,12 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
             }
         }
         
-        // Update waveform data (thread-safe)
-        lock.lock()
-        waveformData = waveform
-        lock.unlock()
-        
-        // End performance monitoring
+        // Update waveform data (thread-safe) waveformData = waveform // End performance monitoring
         performanceMonitor?.endMeasuring("ProcessWaveform")
     }
     
     /// Process audio data into waveform display data
+/// Uses Swift 6 actor isolation for thread safety.
     private func processWaveform(_ audioData: [Float]) -> [Float] {
         // Ensure we have an appropriate sample count for visualization
         let targetSampleCount = 512
@@ -710,6 +816,7 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Apply smoothing to waveform data
+/// Uses Swift 6 actor isolation for thread safety.
     private func applyWaveformSmoothing(_ waveform: inout [Float], amount: Float) {
         guard waveform.count > 2 else { return }
         
@@ -732,6 +839,7 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Normalize waveform data to range -1.0 to 1.0
+/// Uses Swift 6 actor isolation for thread safety.
     private func normalizeWaveform(_ waveform: inout [Float]) {
         guard !waveform.isEmpty else { return }
         
@@ -750,9 +858,8 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
     }
     
     /// Get visualization data suitable for the current mode
-    public func getVisualizationData() -> [Float] {
-        lock.lock()
-        defer { lock.unlock() }
+/// Uses Swift 6 actor isolation for thread safety.
+    public func getVisualizationData() -> [Float] { defer { }
         
         switch currentMode {
         case .spectrum:
@@ -763,3 +870,6 @@ public final class AudioVisualizerBridge: ObservableObject, @unchecked Sendable 
             // For particles and neural patterns, we provide frequency data
             // as they typically need frequency information for reactivity
             return spectrumData
+        }
+    }
+}

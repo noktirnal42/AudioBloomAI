@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import SwiftUI
 import Combine
 import AudioBloomCore
@@ -8,7 +11,8 @@ import AudioBloomUI
 
 /// Main application for AudioBloomAI
 @main
-struct AudioBloomApp: App {
+@available(macOS 15.0, *)
+struct AudioBloomApp: Sendable: App {
     /// App delegate for handling app lifecycle events
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
@@ -59,7 +63,10 @@ struct AudioBloomApp: App {
 }
 
 /// App Delegate for handling app lifecycle
-class AppDelegate: NSObject, NSApplicationDelegate {
+@available(macOS 15.0, *)
+@MainActor
+class AppDelegate: NSObject, NSApplicationDelegate  {
+    // Added @MainActor for UI thread safety
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Set up any required application-level configurations
         setupAppAppearance()
@@ -78,7 +85,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 /// Application-wide state management
-class AppState: ObservableObject {
+@available(macOS 15.0, *)
+@MainActor
+class AppState: ObservableObject  {
+    // Added @MainActor for UI thread safety
     /// Audio engine for processing audio
     @Published private(set) var audioEngine: AudioEngine?
     
@@ -181,7 +191,7 @@ class AppState: ObservableObject {
                 handleError("Microphone access denied. Please enable in System Settings.")
             }
             
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.isInitialized = true
             }
             
@@ -194,7 +204,7 @@ class AppState: ObservableObject {
     func startAudioProcessing() async throws {
         do {
             try audioEngine?.startCapture()
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.isProcessingAudio = true
             }
         } catch {
@@ -205,7 +215,7 @@ class AppState: ObservableObject {
     /// Stop audio processing
     func stopAudioProcessing() {
         audioEngine?.stopCapture()
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.isProcessingAudio = false
         }
     }
@@ -218,7 +228,7 @@ class AppState: ObservableObject {
         Task {
             do {
                 let engine = try NeuralEngine()
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.neuralEngine = engine
                 }
             } catch {
@@ -237,8 +247,8 @@ class AppState: ObservableObject {
     }
     
     /// Load settings from app storage
-    private func loadSettings() {
-        DispatchQueue.main.async {
+    private func loadSettings() async {
+        Task { @MainActor in
             // Load visualization settings
             self.selectedVisualizationMode = VisualizationMode(rawValue: Float(self.settings.visualizationMode)) ?? .spectrum
             self.selectedTheme = Theme(rawValue: Float(self.settings.themeIndex)) ?? .classic
@@ -281,8 +291,8 @@ class AppState: ObservableObject {
     }
     
     /// Handle errors
-    private func handleError(_ message: String) {
-        DispatchQueue.main.async {
+    private func handleError(_ message: String) async {
+        Task { @MainActor in
             self.errorMessage = message
             self.showError = true
         }
@@ -296,7 +306,8 @@ class AppState: ObservableObject {
 }
 
 /// Main Content View for the application
-struct ContentView: View {
+@available(macOS 15.0, *)
+struct ContentView: Sendable: View {
     @EnvironmentObject private var appState: AppState
     
     var body: some View {
@@ -350,7 +361,8 @@ struct ContentView: View {
 }
 
 /// Control panel for visualization settings
-struct ControlPanelView: View {
+@available(macOS 15.0, *)
+struct ControlPanelView: Sendable: View {
     @EnvironmentObject private var appState: AppState
     @State private var showControls = false
     
@@ -472,7 +484,8 @@ import AudioBloomCore
 import Combine
 
 @main
-struct AudioBloomApp: App {
+@available(macOS 15.0, *)
+struct AudioBloomApp: Sendable: App {
     // MARK: - State Objects
     
     /// Audio engine for capturing and processing audio
@@ -625,7 +638,10 @@ struct AudioBloomApp: App {
 }
 
 /// Shared performance monitor
-class PerformanceMonitor: MLProcessingDelegate {
+@available(macOS 15.0, *)
+@MainActor
+class PerformanceMonitor: MLProcessingDelegate  {
+    // Added @MainActor for UI thread safety
     /// Shared instance
     static let shared = PerformanceMonitor()
     

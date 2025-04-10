@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import CoreML
 import Combine
@@ -6,6 +9,7 @@ import CreateML
 import AudioBloomCore
 
 /// Neural Engine for detecting patterns, beats, and emotional content in audio
+@available(macOS 15.0, *)
 public class NeuralEngine: ObservableObject, MLProcessing {
     /// Published ML model output data
     @Published public private(set) var outputData: [Float] = []
@@ -83,7 +87,7 @@ public class NeuralEngine: ObservableObject, MLProcessing {
             self.patternRecognizer.prepare()
             
             // Update the ready state on the main thread
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 self.areModelsReady = true
                 print("Neural Engine models ready")
             }
@@ -173,7 +177,8 @@ public class NeuralEngine: ObservableObject, MLProcessing {
 }
 
 /// Configuration for the Neural Engine
-public struct NeuralEngineConfiguration {
+@available(macOS 15.0, *)
+public struct NeuralEngineConfiguration: Sendable {
     /// Beat detection sensitivity (0.0-1.0)
     public var beatSensitivity: Float = 0.65
     
@@ -206,6 +211,7 @@ public struct NeuralEngineConfiguration {
 // MARK: - Emotional Content Types
 
 /// Types of emotional content in audio
+@available(macOS 15.0, *)
 public enum EmotionalContent: Int, CaseIterable {
     case energetic = 0
     case calm = 1
@@ -228,6 +234,7 @@ public enum EmotionalContent: Int, CaseIterable {
 // MARK: - Pattern Types
 
 /// Types of patterns in audio
+@available(macOS 15.0, *)
 public enum PatternType: Int, CaseIterable {
     case none = 0
     case buildUp = 1
@@ -266,6 +273,7 @@ public enum PatternType: Int, CaseIterable {
 // MARK: - Beat Detector
 
 /// Subsystem for detecting beats in audio data
+@available(macOS 15.0, *)
 class BeatDetector {
     /// Beat detection sensitivity (0.0-1.0)
     var sensitivity: Float
@@ -390,7 +398,8 @@ class BeatDetector {
 }
 
 /// Result of beat detection
-struct BeatDetectionResult {
+@available(macOS 15.0, *)
+struct BeatDetectionResult: Sendable {
     /// Whether a beat was detected
     let isDetected: Bool
     
@@ -407,6 +416,7 @@ struct BeatDetectionResult {
 // MARK: - Emotional Analyzer
 
 /// Subsystem for analyzing emotional content in audio
+@available(macOS 15.0, *)
 class EmotionalAnalyzer {
     /// Emotion classifier model
     private var emotionModel: EmotionClassifierModel?
@@ -570,6 +580,7 @@ private func determineEmotion(
 }
 
 /// Simulated emotion classifier model
+@available(macOS 15.0, *)
 private class EmotionClassifierModel {
     /// Initialize with default parameters
     init() {
@@ -578,7 +589,8 @@ private class EmotionClassifierModel {
 }
 
 /// Result of emotional analysis
-struct EmotionalAnalysisResult {
+@available(macOS 15.0, *)
+struct EmotionalAnalysisResult: Sendable {
     /// Detected emotion
     let emotion: EmotionalContent
     
@@ -598,6 +610,7 @@ struct EmotionalAnalysisResult {
 // MARK: - Pattern Recognizer
 
 /// Subsystem for recognizing patterns in audio sequences
+@available(macOS 15.0, *)
 class PatternRecognizer {
     /// Pattern detection threshold
     private var threshold: Float = 0.3

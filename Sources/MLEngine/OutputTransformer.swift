@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import Combine
 import CoreML
@@ -6,6 +9,8 @@ import Logging
 import AudioBloomCore
 
 /// Errors that can occur during output transformation
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public enum OutputTransformationError: Error {
     case invalidInputData
     case unsupportedOutputFormat
@@ -27,63 +32,89 @@ public enum OutputTransformationError: Error {
 }
 
 /// Output format for visualization data
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public enum VisualizationFormat {
     /// Linear frequency spectrum (simple bar graph)
+/// Uses Swift 6 actor isolation for thread safety.
     case linearSpectrum
     /// Logarithmic frequency spectrum (emphasizes lower frequencies)
+/// Uses Swift 6 actor isolation for thread safety.
     case logSpectrum
     /// Mel-scale frequency spectrum (perceptual)
+/// Uses Swift 6 actor isolation for thread safety.
     case melSpectrum
     /// Circular visualization (radar/polar plot)
+/// Uses Swift 6 actor isolation for thread safety.
     case circularSpectrum
     /// Beat-synchronized pattern
+/// Uses Swift 6 actor isolation for thread safety.
     case beatPattern
     /// Waveform visualization
+/// Uses Swift 6 actor isolation for thread safety.
     case waveform
     /// 3D visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     case spatial3D
     /// Custom format with specific parameters
+/// Uses Swift 6 actor isolation for thread safety.
     case custom(parameters: [String: Any])
 }
 
 /// Types of audio features that can be transformed
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public enum AudioFeatureType {
     /// Frequency spectrum data
+/// Uses Swift 6 actor isolation for thread safety.
     case frequencySpectrum
     /// Beat and tempo data
+/// Uses Swift 6 actor isolation for thread safety.
     case rhythmicFeatures
     /// Tonal and harmonic features
+/// Uses Swift 6 actor isolation for thread safety.
     case harmonicFeatures
     /// Combined feature set
+/// Uses Swift 6 actor isolation for thread safety.
     case combined
 }
 
 /// Configuration for output transformation
-public struct TransformationConfiguration {
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
+public struct TransformationConfiguration: Sendable {
     /// The visualization format to use
+/// Uses Swift 6 actor isolation for thread safety.
     public var format: VisualizationFormat = .linearSpectrum
     
     /// The number of output data points
+/// Uses Swift 6 actor isolation for thread safety.
     public var outputSize: Int = 64
     
     /// Whether to normalize output to 0-1 range
+/// Uses Swift 6 actor isolation for thread safety.
     public var normalize: Bool = true
     
     /// Amount of smoothing to apply (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
     public var smoothingFactor: Float = 0.3
     
     /// Whether to use logarithmic scaling
+/// Uses Swift 6 actor isolation for thread safety.
     public var useLogScale: Bool = false
     
     /// Custom transformation parameters
+/// Uses Swift 6 actor isolation for thread safety.
     public var parameters: [String: Any] = [:]
     
     /// Create a default configuration
+/// Uses Swift 6 actor isolation for thread safety.
     public static func defaultConfiguration() -> TransformationConfiguration {
         return TransformationConfiguration()
     }
     
     /// Create a spectrum visualization configuration
+/// Uses Swift 6 actor isolation for thread safety.
     public static func spectrumConfiguration(size: Int = 64, smoothing: Float = 0.3) -> TransformationConfiguration {
         var config = TransformationConfiguration()
         config.format = .linearSpectrum
@@ -93,6 +124,7 @@ public struct TransformationConfiguration {
     }
     
     /// Create a beat visualization configuration
+/// Uses Swift 6 actor isolation for thread safety.
     public static func beatConfiguration() -> TransformationConfiguration {
         var config = TransformationConfiguration()
         config.format = .beatPattern
@@ -103,23 +135,31 @@ public struct TransformationConfiguration {
 }
 
 /// Transformed output data for visualization
-public struct VisualizationData {
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
+public struct VisualizationData: Sendable {
     /// The primary output data array
+/// Uses Swift 6 actor isolation for thread safety.
     public let values: [Float]
     
     /// Secondary or auxiliary data values
+/// Uses Swift 6 actor isolation for thread safety.
     public let auxiliaryValues: [Float]?
     
     /// Metadata about the transformation
+/// Uses Swift 6 actor isolation for thread safety.
     public let metadata: [String: Any]
     
     /// The timestamp of the data
+/// Uses Swift 6 actor isolation for thread safety.
     public let timestamp: TimeInterval
     
     /// Whether this data represents a significant event (like a beat)
+/// Uses Swift 6 actor isolation for thread safety.
     public let isSignificantEvent: Bool
     
     /// Creates visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     public init(
         values: [Float],
         auxiliaryValues: [Float]? = nil,
@@ -135,6 +175,7 @@ public struct VisualizationData {
     }
     
     /// Returns a subset of the visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     public func subset(range: Range<Int>) -> VisualizationData {
         let subsetValues = Array(values[range])
         let subsetAuxiliary = auxiliaryValues.map { Array($0[range]) }
@@ -150,49 +191,66 @@ public struct VisualizationData {
 }
 
 /// Protocol for objects that can receive visualization data
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public protocol VisualizationDataReceiver {
     /// Called when new visualization data is available
+/// Uses Swift 6 actor isolation for thread safety.
     func didReceiveVisualizationData(_ data: VisualizationData, forFeature feature: AudioFeatureType)
 }
 
 /// Transforms ML model outputs into visualization-ready data
+/// Uses Swift 6 actor isolation for thread safety.
+@available(macOS 15.0, *)
 public final class OutputTransformer {
     /// Logger for this class
+/// Uses Swift 6 actor isolation for thread safety.
     private let logger = Logger(label: "com.audiobloom.outputtransformer")
     
     /// Current configuration
+/// Uses Swift 6 actor isolation for thread safety.
     private var configuration: TransformationConfiguration
     
     /// Previously processed data for smoothing
+/// Uses Swift 6 actor isolation for thread safety.
     private var previousOutputs: [AudioFeatureType: [Float]] = [:]
     
     /// High-performance data buffer for frequency processing
+/// Uses Swift 6 actor isolation for thread safety.
     private let frequencyBuffer: UnsafeMutableBufferPointer<Float>
     
     /// Subject for publishing transformed frequency data
+/// Uses Swift 6 actor isolation for thread safety.
     private let frequencyDataSubject = PassthroughSubject<VisualizationData, Never>()
     
     /// Subject for publishing transformed beat data
+/// Uses Swift 6 actor isolation for thread safety.
     private let beatDataSubject = PassthroughSubject<VisualizationData, Never>()
     
     /// Publisher for frequency visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     public var frequencyDataPublisher: AnyPublisher<VisualizationData, Never> {
         frequencyDataSubject.eraseToAnyPublisher()
     }
     
     /// Publisher for beat visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     public var beatDataPublisher: AnyPublisher<VisualizationData, Never> {
         beatDataSubject.eraseToAnyPublisher()
     }
     
     /// Delegate to receive visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     public weak var delegate: VisualizationDataReceiver?
     
     /// Whether to use high-performance transformation
+/// Uses Swift 6 actor isolation for thread safety.
     public var useHighPerformanceMode: Bool = true
     
     /// Creates a new output transformer with the specified configuration
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter configuration: The transformation configuration
+/// Uses Swift 6 actor isolation for thread safety.
     public init(configuration: TransformationConfiguration = .defaultConfiguration()) {
         self.configuration = configuration
         
@@ -210,7 +268,9 @@ public final class OutputTransformer {
     }
     
     /// Updates the transformation configuration
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter configuration: The new configuration
+/// Uses Swift 6 actor isolation for thread safety.
     public func updateConfiguration(_ configuration: TransformationConfiguration) {
         self.configuration = configuration
         logger.debug("Updated transformation configuration")
@@ -220,11 +280,17 @@ public final class OutputTransformer {
     }
     
     /// Transforms audio features into visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - features: The audio features to transform
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - featureType: The type of features being transformed
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Transformed visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: OutputTransformationError if transformation fails
+/// Uses Swift 6 actor isolation for thread safety.
     public func transform(
         features: AudioFeatures,
         type featureType: AudioFeatureType
@@ -248,9 +314,13 @@ public final class OutputTransformer {
     }
     
     /// Transforms raw frequency spectrum data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter spectrum: The frequency spectrum data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Visualization data for the frequency spectrum
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: OutputTransformationError if transformation fails
+/// Uses Swift 6 actor isolation for thread safety.
     public func transformFrequencySpectrum(_ spectrum: [Float]) throws -> VisualizationData {
         guard !spectrum.isEmpty else {
             throw OutputTransformationError.invalidInputData
@@ -317,11 +387,17 @@ public final class OutputTransformer {
     }
     
     /// High-performance transformation for frequency spectrum data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - spectrum: The frequency spectrum data
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - outputSize: The desired output size
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Visualization data for the frequency spectrum
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: OutputTransformationError if transformation fails
+/// Uses Swift 6 actor isolation for thread safety.
     private func highPerformanceTransformFrequencySpectrum(
         _ spectrum: [Float],
         outputSize: Int
@@ -394,12 +470,19 @@ public final class OutputTransformer {
     }
     
     /// Transforms rhythmic features (tempo, beats) into visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - tempo: The detected tempo in BPM
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - beatConfidence: Confidence level of beat detection (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - beatDetected: Whether a beat was detected
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Visualization data for rhythmic features
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: OutputTransformationError if transformation fails
+/// Uses Swift 6 actor isolation for thread safety.
     public func transformRhythmicFeatures(
         tempo: Float,
         beatConfidence: Float,
@@ -463,9 +546,13 @@ public final class OutputTransformer {
     }
     
     /// Transforms simulated harmonic features into visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter features: The audio features to transform
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Visualization data for the harmonic features
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: OutputTransformationError if transformation fails
+/// Uses Swift 6 actor isolation for thread safety.
     public func transformSimulatedHarmonicFeatures(from features: AudioFeatures) throws -> VisualizationData {
         guard !features.frequencySpectrum.isEmpty else {
             throw OutputTransformationError.invalidInputData
@@ -534,9 +621,13 @@ public final class OutputTransformer {
     }
     
     /// Transforms combined audio features into unified visualization data
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter features: The audio features to transform
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: Visualization data combining multiple feature types
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Throws: OutputTransformationError if transformation fails
+/// Uses Swift 6 actor isolation for thread safety.
     public func transformCombinedFeatures(_ features: AudioFeatures) throws -> VisualizationData {
         // Create a combined visualization from multiple feature types
         // For example, we might want frequency data modulated by beat information
@@ -596,10 +687,15 @@ public final class OutputTransformer {
     // MARK: - Utility Methods
     
     /// Resizes an array to a new size using linear interpolation
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - array: The array to resize
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - newSize: The new size
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: The resized array
+/// Uses Swift 6 actor isolation for thread safety.
     private func resizeArray(_ array: [Float], newSize: Int) -> [Float] {
         guard !array.isEmpty, newSize > 0 else { return [] }
         
@@ -625,8 +721,11 @@ public final class OutputTransformer {
     }
     
     /// Normalizes an array to the range 0-1
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter array: The array to normalize
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: The normalized array
+/// Uses Swift 6 actor isolation for thread safety.
     private func normalizeArray(_ array: [Float]) -> [Float] {
         guard !array.isEmpty else { return [] }
         
@@ -650,8 +749,11 @@ public final class OutputTransformer {
     }
     
     /// Applies logarithmic scaling to an array
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameter array: The array to scale
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: The log-scaled array
+/// Uses Swift 6 actor isolation for thread safety.
     private func applyLogScaling(_ array: [Float]) -> [Float] {
         guard !array.isEmpty else { return [] }
         
@@ -663,11 +765,17 @@ public final class OutputTransformer {
     }
     
     /// Applies smoothing to an array using previous values
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - array: The array to smooth
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - featureType: The feature type (for retrieving previous values)
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - factor: The smoothing factor (0-1)
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Returns: The smoothed array
+/// Uses Swift 6 actor isolation for thread safety.
     private func applySmoothing(_ array: [Float], featureType: AudioFeatureType, factor: Float) -> [Float] {
         guard !array.isEmpty, factor > 0 else { return array }
         

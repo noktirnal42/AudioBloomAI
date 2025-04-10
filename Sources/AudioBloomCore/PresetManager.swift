@@ -1,9 +1,13 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 import Foundation
 import Combine
 import SwiftUI
 
 /// Represents a saved configuration preset for AudioBloom
-public struct Preset: Identifiable, Codable, Equatable {
+@available(macOS 15.0, *)
+public struct Preset: Sendable: Identifiable, Codable, Equatable {
     /// Unique identifier for the preset
     public let id: UUID
     
@@ -135,7 +139,8 @@ public struct Preset: Identifiable, Codable, Equatable {
 }
 
 /// Visualization settings for a preset
-public struct VisualizationSettings: Codable, Equatable {
+@available(macOS 15.0, *)
+public struct VisualizationSettings: Sendable: Codable, Equatable {
     /// The visual theme
     public var theme: AudioBloomCore.VisualTheme
     
@@ -175,7 +180,8 @@ public struct VisualizationSettings: Codable, Equatable {
 }
 
 /// Audio settings for a preset
-public struct AudioSettings: Codable, Equatable {
+@available(macOS 15.0, *)
+public struct AudioSettings: Sendable: Codable, Equatable {
     /// Input device identifier
     public var inputDevice: String?
     
@@ -221,7 +227,8 @@ public struct AudioSettings: Codable, Equatable {
 }
 
 /// Neural engine settings for a preset
-public struct NeuralSettings: Codable, Equatable {
+@available(macOS 15.0, *)
+public struct NeuralSettings: Sendable: Codable, Equatable {
     /// Whether neural enhancement is enabled
     public var enabled: Bool
     
@@ -255,7 +262,10 @@ public struct NeuralSettings: Codable, Equatable {
 }
 
 /// Manages preset operations including saving, loading, and applying presets
-public class PresetManager: ObservableObject {
+@available(macOS 15.0, *)
+public @MainActor
+class PresetManager: ObservableObject  {
+    // Added @MainActor for UI thread safety
     /// List of available presets
     @Published public private(set) var presets: [Preset] = []
     

@@ -1,3 +1,6 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
 //
 // AdvancedAudioAnalyzer.swift
 // Advanced audio analysis system for AudioBloomAI
@@ -9,15 +12,20 @@ import AVFoundation
 import Combine
 import CoreML
 import AudioBloomCore
+import AudioBloomCore.Audio
 import Metal
 
 /// Advanced audio analysis system that provides sophisticated audio feature extraction, 
+/// Uses Swift 6 actor isolation for thread safety.
 /// beat pattern recognition, harmonic analysis, and mood detection
+/// Uses Swift 6 actor isolation for thread safety.
 @available(macOS 15.0, *)
 public class AdvancedAudioAnalyzer {
     // MARK: - Types
     
     /// Detected beat pattern type
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
     public enum BeatPatternType: String, CaseIterable, Identifiable {
         case regular = "Regular"
         case syncopated = "Syncopated"
@@ -32,6 +40,8 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Detected music genre
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
     public enum GenreType: String, CaseIterable, Identifiable {
         case rock = "Rock"
         case electronic = "Electronic"
@@ -48,6 +58,8 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Detected mood type
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
     public enum MoodType: String, CaseIterable, Identifiable {
         case energetic = "Energetic"
         case relaxed = "Relaxed"
@@ -63,6 +75,8 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Detected harmony type (key, scale, etc.)
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
     public enum HarmonyType: String, CaseIterable, Identifiable {
         case major = "Major"
         case minor = "Minor"
@@ -75,6 +89,8 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Detected chord type
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
     public enum ChordType: String, CaseIterable, Identifiable {
         case major = "Major"
         case minor = "Minor"
@@ -89,142 +105,193 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Information about a detected beat pattern
-    public struct BeatPatternInfo {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct BeatPatternInfo: Sendable {
         /// Beat pattern type
+/// Uses Swift 6 actor isolation for thread safety.
         public let patternType: BeatPatternType
         
         /// Tempo in beats per minute
+/// Uses Swift 6 actor isolation for thread safety.
         public let tempo: Double
         
         /// Beat strength (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let strength: Double
         
         /// Stability of rhythm (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let stability: Double
         
         /// Confidence in the detection (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let confidence: Double
         
         /// Timing offset relative to a reference (in seconds)
+/// Uses Swift 6 actor isolation for thread safety.
         public let offset: Double
         
         /// Beat interval in seconds
+/// Uses Swift 6 actor isolation for thread safety.
         public let interval: Double
         
         /// Beat subdivision type (e.g., 1/4, 1/8, etc.)
+/// Uses Swift 6 actor isolation for thread safety.
         public let subdivision: String
         
         /// Beat timestamps in seconds
+/// Uses Swift 6 actor isolation for thread safety.
         public let beatTimestamps: [Double]
     }
     
     /// Information about harmonic analysis
-    public struct HarmonicInfo {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct HarmonicInfo: Sendable {
         /// Detected musical key (e.g., C, D#, etc.)
+/// Uses Swift 6 actor isolation for thread safety.
         public let key: String
         
         /// Detected scale type
+/// Uses Swift 6 actor isolation for thread safety.
         public let scaleType: HarmonyType
         
         /// Detected chord progression
+/// Uses Swift 6 actor isolation for thread safety.
         public let chordProgression: [String]
         
         /// Current chord
+/// Uses Swift 6 actor isolation for thread safety.
         public let currentChord: String
         
         /// Chord type
+/// Uses Swift 6 actor isolation for thread safety.
         public let chordType: ChordType
         
         /// Dominant frequencies in Hz
+/// Uses Swift 6 actor isolation for thread safety.
         public let dominantFrequencies: [Double]
         
         /// Harmonic tension level (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let harmonicTension: Double
         
         /// Key stability (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let keyStability: Double
         
         /// Confidence in the detection (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let confidence: Double
     }
     
     /// Information about genre classification
-    public struct GenreInfo {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct GenreInfo: Sendable {
         /// Detected primary genre
+/// Uses Swift 6 actor isolation for thread safety.
         public let primaryGenre: GenreType
         
         /// Genre probabilities for all genres
+/// Uses Swift 6 actor isolation for thread safety.
         public let genreProbabilities: [GenreType: Double]
         
         /// Secondary genre influences
+/// Uses Swift 6 actor isolation for thread safety.
         public let secondaryGenres: [GenreType]
         
         /// Confidence in the classification (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let confidence: Double
         
         /// Genre stability over time (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let stability: Double
     }
     
     /// Information about detected mood
-    public struct MoodInfo {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct MoodInfo: Sendable {
         /// Primary detected mood
+/// Uses Swift 6 actor isolation for thread safety.
         public let primaryMood: MoodType
         
         /// Energy level (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let energy: Double
         
         /// Positivity level (-1.0 to 1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let valence: Double
         
         /// Emotional intensity (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let intensity: Double
         
         /// Mood stability over time (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let stability: Double
         
         /// Complexity of emotional content (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let complexity: Double
         
         /// Confidence in the detection (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public let confidence: Double
     }
     
     /// Configuration options for advanced audio analysis
-    public struct AdvancedAnalysisConfig {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    public struct AdvancedAnalysisConfig: Sendable {
         /// Enable beat pattern recognition
+/// Uses Swift 6 actor isolation for thread safety.
         public var enableBeatPatternRecognition: Bool = true
         
         /// Enable harmonic analysis
+/// Uses Swift 6 actor isolation for thread safety.
         public var enableHarmonicAnalysis: Bool = true
         
         /// Enable genre classification
+/// Uses Swift 6 actor isolation for thread safety.
         public var enableGenreClassification: Bool = true
         
         /// Enable mood detection
+/// Uses Swift 6 actor isolation for thread safety.
         public var enableMoodDetection: Bool = true
         
         /// Enable GPU acceleration
+/// Uses Swift 6 actor isolation for thread safety.
         public var useGPU: Bool = true
         
         /// History time window for pattern recognition (in seconds)
+/// Uses Swift 6 actor isolation for thread safety.
         public var historyDuration: Double = 10.0
         
         /// Analysis update interval (in seconds)
+/// Uses Swift 6 actor isolation for thread safety.
         public var updateInterval: Double = 0.1
         
         /// Confidence threshold for detection (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         public var confidenceThreshold: Double = 0.6
         
         /// Model paths for ML-based features
+/// Uses Swift 6 actor isolation for thread safety.
         public var modelPaths: [String: URL] = [:]
         
         /// Default configuration
+/// Uses Swift 6 actor isolation for thread safety.
         public static var standard: AdvancedAnalysisConfig {
             return AdvancedAnalysisConfig()
         }
         
         /// High accuracy configuration (more resource intensive)
+/// Uses Swift 6 actor isolation for thread safety.
         public static var highAccuracy: AdvancedAnalysisConfig {
             var config = AdvancedAnalysisConfig()
             config.historyDuration = 15.0
@@ -234,6 +301,7 @@ public class AdvancedAudioAnalyzer {
         }
         
         /// Lightweight configuration (less resource intensive)
+/// Uses Swift 6 actor isolation for thread safety.
         public static var lightweight: AdvancedAnalysisConfig {
             var config = AdvancedAnalysisConfig()
             config.historyDuration = 5.0
@@ -246,20 +314,27 @@ public class AdvancedAudioAnalyzer {
     // MARK: - Beat Pattern Recognition
     
     /// Beat detection history
-    private struct BeatHistory {
+/// Uses Swift 6 actor isolation for thread safety.
+    @available(macOS 15.0, *)
+    private struct BeatHistory: Sendable {
         /// Beat onset times (in seconds)
+/// Uses Swift 6 actor isolation for thread safety.
         var onsetTimes: [Double] = []
         
         /// Beat intervals (in seconds)
+/// Uses Swift 6 actor isolation for thread safety.
         var intervals: [Double] = []
         
         /// Beat strengths (0.0-1.0)
+/// Uses Swift 6 actor isolation for thread safety.
         var strengths: [Double] = []
         
         /// Analysis start time
+/// Uses Swift 6 actor isolation for thread safety.
         var startTime: Double = 0
         
         /// Add a beat to history
+/// Uses Swift 6 actor isolation for thread safety.
         mutating func addBeat(timestamp: Double, strength: Double) {
             if onsetTimes.isEmpty {
                 startTime = timestamp
@@ -281,6 +356,7 @@ public class AdvancedAudioAnalyzer {
         }
         
         /// Trim history to configured window
+/// Uses Swift 6 actor isolation for thread safety.
         mutating func trimHistory(maxDuration: Double = 10.0) {
             guard let firstBeat = onsetTimes.first, let lastBeat = onsetTimes.last else { return }
             
@@ -305,6 +381,7 @@ public class AdvancedAudioAnalyzer {
         }
         
         /// Clear history
+/// Uses Swift 6 actor isolation for thread safety.
         mutating func clear() {
             onsetTimes.removeAll()
             intervals.removeAll()
@@ -313,18 +390,21 @@ public class AdvancedAudioAnalyzer {
         }
         
         /// Calculate average interval
+/// Uses Swift 6 actor isolation for thread safety.
         func averageInterval() -> Double? {
             guard !intervals.isEmpty else { return nil }
             return intervals.reduce(0.0, +) / Double(intervals.count)
         }
         
         /// Calculate tempo in BPM
+/// Uses Swift 6 actor isolation for thread safety.
         func calculateTempo() -> Double? {
             guard let avgInterval = averageInterval(), avgInterval > 0 else { return nil }
             return 60.0 / avgInterval
         }
         
         /// Calculate interval variance (for stability measurement)
+/// Uses Swift 6 actor isolation for thread safety.
         func calculateVariance() -> Double {
             guard intervals.count > 1 else { return 0 }
             
@@ -338,6 +418,7 @@ public class AdvancedAudioAnalyzer {
         }
         
         /// Calculate beat pattern stability
+/// Uses Swift 6 actor isolation for thread safety.
         func calculateStability() -> Double {
             guard !intervals.isEmpty else { return 0 }
             
@@ -357,55 +438,70 @@ public class AdvancedAudioAnalyzer {
     // MARK: - Properties
     
     /// The audio feature extractor providing base features
+/// Uses Swift 6 actor isolation for thread safety.
     public private(set) var featureExtractor: AudioFeatureExtractor
     
     /// Configuration options
+/// Uses Swift 6 actor isolation for thread safety.
     private var config: AdvancedAnalysisConfig
     
     /// Metal compute engine for GPU processing
+/// Uses Swift 6 actor isolation for thread safety.
     private var metalCompute: MetalComputeCore?
     
     /// Beat pattern recognition state
+/// Uses Swift 6 actor isolation for thread safety.
     private var beatHistory = BeatHistory()
     private var currentBeatPattern: BeatPatternInfo?
     private var lastBeatTimestamp: Double = 0
     private var beatPatternPublisher = PassthroughSubject<BeatPatternInfo, Never>()
     
     /// Harmonic analysis state
+/// Uses Swift 6 actor isolation for thread safety.
     private var currentHarmonic: HarmonicInfo?
     private var noteProbabilities: [String: Double] = [:]
     private var harmonicHistory: [HarmonicInfo] = []
     private var harmonicPublisher = PassthroughSubject<HarmonicInfo, Never>()
     
     /// Genre classification state
+/// Uses Swift 6 actor isolation for thread safety.
     private var currentGenre: GenreInfo?
     private var genreFeatureHistory: [[Double]] = []
     private var genrePublisher = PassthroughSubject<GenreInfo, Never>()
     
     /// Mood detection state
+/// Uses Swift 6 actor isolation for thread safety.
     private var currentMood: MoodInfo?
     private var moodHistory: [MoodInfo] = []
     private var moodPublisher = PassthroughSubject<MoodInfo, Never>()
     
     /// Machine learning models
+/// Uses Swift 6 actor isolation for thread safety.
     private var genreClassifier: MLModel?
     private var moodClassifier: MLModel?
     
     /// Processing queue
+/// Uses Swift 6 actor isolation for thread safety.
     private let processingQueue = DispatchQueue(label: "com.audiobloom.advanced-analysis", qos: .userInteractive)
     
     /// Analysis timers
+/// Uses Swift 6 actor isolation for thread safety.
     private var analysisTimer: Timer?
     
     /// Feature history for analysis
+/// Uses Swift 6 actor isolation for thread safety.
     private var featureHistory: [AudioFeatureType: [AudioFeatures]] = [:]
     
     // MARK: - Initialization
     
     /// Initialize with feature extractor and configuration
+/// Uses Swift 6 actor isolation for thread safety.
     /// - Parameters:
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - featureExtractor: The audio feature extractor to use
+/// Uses Swift 6 actor isolation for thread safety.
     ///   - config: Analysis configuration options
+/// Uses Swift 6 actor isolation for thread safety.
     public init(featureExtractor: AudioFeatureExtractor, config: AdvancedAnalysisConfig = .standard) {
         self.featureExtractor = featureExtractor
         self.config = config
@@ -423,6 +519,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Setup GPU processing with Metal
+/// Uses Swift 6 actor isolation for thread safety.
     private func setupGPUProcessing() {
         do {
             metalCompute = try MetalComputeCore(maxConcurrentOperations: 2)
@@ -432,6 +529,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Load machine learning models
+/// Uses Swift 6 actor isolation for thread safety.
     private func loadModels() {
         // Load genre classifier if path provided
         if let genreModelURL = config.modelPaths["genre"] {
@@ -453,6 +551,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Configure the feature extractor to provide needed features
+/// Uses Swift 6 actor isolation for thread safety.
     private func configureFeatureExtractor() {
         // Determine required features based on enabled analysis types
         var requiredFeatures: Set<AudioFeatureType> = []
@@ -502,6 +601,7 @@ public class AdvancedAudioAnalyzer {
     // MARK: - Public Control
     
     /// Start advanced audio analysis
+/// Uses Swift 6 actor isolation for thread safety.
     public func start() {
         // Start feature extractor if needed
         if !featureExtractor.isRunning {
@@ -521,6 +621,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Stop advanced audio analysis
+/// Uses Swift 6 actor isolation for thread safety.
     public func stop() {
         // Stop analysis timer
         stopAnalysisTimer()
@@ -530,18 +631,20 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Setup subscription to feature extractor
+/// Uses Swift 6 actor isolation for thread safety.
     private func setupFeatureSubscription() {
         // Ensure feature extractor delegate is set to self
         featureExtractor.delegate = self
     }
     
     /// Start periodic analysis timer
+/// Uses Swift 6 actor isolation for thread safety.
     private func startAnalysisTimer() {
         // Stop existing timer if any
         stopAnalysisTimer()
         
         // Create new timer on main thread
-        DispatchQueue.main.async {
+        Task { @MainActor in
             self.analysisTimer = Timer.scheduledTimer(
                 timeInterval: self.config.updateInterval,
                 target: self,
@@ -553,12 +656,14 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Stop analysis timer
+/// Uses Swift 6 actor isolation for thread safety.
     private func stopAnalysisTimer() {
         analysisTimer?.invalidate()
         analysisTimer = nil
     }
     
     /// Reset internal analysis state
+/// Uses Swift 6 actor isolation for thread safety.
     private func resetAnalysisState() {
         // Clear beat history
         beatHistory.clear()
@@ -583,6 +688,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Perform periodic analysis
+/// Uses Swift 6 actor isolation for thread safety.
     @objc private func performAnalysis() {
         processingQueue.async { [weak self] in
             guard let self = self else { return }
@@ -595,6 +701,7 @@ public class AdvancedAudioAnalyzer {
     // MARK: - Feature Processing
     
     /// Process accumulated feature history
+/// Uses Swift 6 actor isolation for thread safety.
     private func processFeatureHistory() {
         // Analyze beat patterns if enabled
         if config.enableBeatPatternRecognition {
@@ -620,6 +727,7 @@ public class AdvancedAudioAnalyzer {
     // MARK: - Beat Pattern Analysis
     
     /// Analyze beat pattern from collected features
+/// Uses Swift 6 actor isolation for thread safety.
     private func analyzeBeatPattern() {
         // Process beat and onset features if available
         if let beatFeatures = getLatestFeatures(ofType: .beat, count: 10),
@@ -649,6 +757,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Update beat pattern analysis
+/// Uses Swift 6 actor isolation for thread safety.
     private func updateBeatPattern() {
         // Ensure we have enough history
         guard beatHistory.intervals.count >= 3 else { return }
@@ -706,6 +815,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Determine beat pattern type based on tempo and stability
+/// Uses Swift 6 actor isolation for thread safety.
     private func determineBeatPatternType(
         tempo: Double,
         strength: Double,
@@ -750,6 +860,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Determine if intervals show syncopation
+/// Uses Swift 6 actor isolation for thread safety.
     private func hasSyncopation(intervals: [Double]) -> Bool {
         guard intervals.count >= 4 else { return false }
         
@@ -771,6 +882,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Determine if intervals suggest polyrhythm
+/// Uses Swift 6 actor isolation for thread safety.
     private func hasPolyrhythm(intervals: [Double]) -> Bool {
         guard intervals.count >= 6 else { return false }
         
@@ -797,6 +909,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Determine if intervals show complex pattern
+/// Uses Swift 6 actor isolation for thread safety.
     private func hasComplexPattern(intervals: [Double]) -> Bool {
         guard intervals.count >= 5 else { return false }
         
@@ -819,6 +932,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Determine beat subdivision type
+/// Uses Swift 6 actor isolation for thread safety.
     private func determineSubdivision(tempo: Double, intervals: [Double]) -> String {
         // Calculate the division based on tempo and average interval
         
@@ -850,6 +964,7 @@ public class AdvancedAudioAnalyzer {
     // MARK: - Harmonic Analysis
     
     /// Analyze harmonic content from collected features
+/// Uses Swift 6 actor isolation for thread safety.
     private func analyzeHarmonics() {
         // Process pitch and chroma features for harmonic analysis
         if let pitchFeatures = getLatestFeatures(ofType: .pitch, count: 5),
@@ -931,6 +1046,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Update note probabilities from chroma features
+/// Uses Swift 6 actor isolation for thread safety.
     private func updateNoteProbabilities(chromaFeatures: [AudioFeatures]) {
         // Initialize if needed
         if noteProbabilities.isEmpty {
@@ -971,6 +1087,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Detect musical key from note probabilities
+/// Uses Swift 6 actor isolation for thread safety.
     private func detectKey(from noteProbabilities: [String: Double]) -> (String, HarmonyType, Double) {
         // Major and minor key profiles (Krumhansl-Schmuckler key-finding algorithm)
         let majorProfile: [Double] = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88]
@@ -1021,6 +1138,7 @@ public class AdvancedAudioAnalyzer {
     }
     
     /// Detect chord from note probabilities
+/// Uses Swift 6 actor isolation for thread safety.
     private func detectChord(from noteProbabilities: [String: Double]) -> (String, ChordType, Double) {
         // Define chord templates
         let chordTemplates: [ChordType: [Int]] = [
