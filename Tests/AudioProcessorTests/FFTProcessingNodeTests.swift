@@ -103,9 +103,9 @@ final class FFTProcessingNodeTests: XCTestCase {
     private func generateSineWave(frequency: Double, amplitude: Float, sampleCount: Int, sampleRate: Double) -> [Float] {
         var samples = [Float](repeating: 0, count: sampleCount)
         
-        for i in 0..<sampleCount {
-            let phase = 2.0 * Double.pi * frequency * Double(i) / sampleRate
-            samples[i] = amplitude * Float(sin(phase))
+        for sampleIndex in 0..<sampleCount {
+            let phase = 2.0 * Double.pi * frequency * Double(sampleIndex) / sampleRate
+            samples[sampleIndex] = amplitude * Float(sin(phase))
         }
         
         return samples
@@ -349,15 +349,15 @@ final class FFTProcessingNodeTests: XCTestCase {
         
         // Calculate main lobe energy
         var mainLobeEnergy: Float = 0
-        for i in lowerBound...upperBound {
-            mainLobeEnergy += spectrum[i] * spectrum[i]
+        for binIndex in lowerBound...upperBound {
+            mainLobeEnergy += spectrum[binIndex] * spectrum[binIndex]
         }
         
         // Calculate side lobe energy (all bins outside the main lobe)
         var sideLobeEnergy: Float = 0
-        for i in 0..<spectrum.count {
-            if i < lowerBound || i > upperBound {
-                sideLobeEnergy += spectrum[i] * spectrum[i]
+        for binIndex in 0..<spectrum.count {
+            if binIndex < lowerBound || binIndex > upperBound {
+                sideLobeEnergy += spectrum[binIndex] * spectrum[binIndex]
             }
         }
         
@@ -522,13 +522,13 @@ final class FFTProcessingNodeTests: XCTestCase {
             (5000.0, 0.4)   // High frequency (treble)
         ]
         
-        for i in 0..<defaultFFTSize {
+        for sampleIndex in 0..<defaultFFTSize {
             for component in components {
-                let phase = 2.0 * Double.pi * component.frequency * Double(i) / sampleRate
-                complexSignal[i] += component.amplitude * sin(Float(phase))
+                let phase = 2.0 * Double.pi * component.frequency * Double(sampleIndex) / sampleRate
+                complexSignal[sampleIndex] += component.amplitude * sin(Float(phase))
             }
             // Normalize to prevent clipping
-            complexSignal[i] = min(max(complexSignal[i], -1.0), 1.0)
+            complexSignal[sampleIndex] = min(max(complexSignal[sampleIndex], -1.0), 1.0)
         }
         
         // Fill input with complex signal
@@ -723,15 +723,15 @@ final class FFTProcessingNodeTests: XCTestCase {
         
         // Create a complex test signal
         var complexSignal = [Float](repeating: 0.0, count: defaultFFTSize)
-        for i in 0..<defaultFFTSize {
+        for sampleIndex in 0..<defaultFFTSize {
             // Mix several frequencies
-            let phase1 = 2.0 * Double.pi * 100.0 * Double(i) / sampleRate
-            let phase2 = 2.0 * Double.pi * 1000.0 * Double(i) / sampleRate
-            let phase3 = 2.0 * Double.pi * 5000.0 * Double(i) / sampleRate
+            let phase1 = 2.0 * Double.pi * 100.0 * Double(sampleIndex) / sampleRate
+            let phase2 = 2.0 * Double.pi * 1000.0 * Double(sampleIndex) / sampleRate
+            let phase3 = 2.0 * Double.pi * 5000.0 * Double(sampleIndex) / sampleRate
             
-            complexSignal[i] = 0.3 * sin(Float(phase1)) + 
-                              0.3 * sin(Float(phase2)) + 
-                              0.3 * sin(Float(phase3))
+            complexSignal[sampleIndex] = 0.3 * sin(Float(phase1)) + 
+                                        0.3 * sin(Float(phase2)) + 
+                                        0.3 * sin(Float(phase3))
         }
         
         // Fill input buffer
@@ -783,14 +783,14 @@ final class FFTProcessingNodeTests: XCTestCase {
         
         // Create a complex test signal
         var complexSignal = [Float](repeating: 0.0, count: 4096)
-        for i in 0..<4096 {
+        for sampleIndex in 0..<4096 {
             // Mix several frequencies with some noise
-            let phase1 = 2.0 * Double.pi * 100.0 * Double(i) / sampleRate
-            let phase2 = 2.0 * Double.pi * 1000.0 * Double(i) / sampleRate
+            let phase1 = 2.0 * Double.pi * 100.0 * Double(sampleIndex) / sampleRate
+            let phase2 = 2.0 * Double.pi * 1000.0 * Double(sampleIndex) / sampleRate
             
-            complexSignal[i] = 0.4 * sin(Float(phase1)) + 
-                              0.4 * sin(Float(phase2)) + 
-                              0.2 * Float.random(in: -1.0...1.0) // Add some noise
+            complexSignal[sampleIndex] = 0.4 * sin(Float(phase1)) + 
+                                        0.4 * sin(Float(phase2)) + 
+                                        0.2 * Float.random(in: -1.0...1.0) // Add some noise
         }
         
         // Fill input buffer
