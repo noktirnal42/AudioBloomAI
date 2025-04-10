@@ -1,3 +1,138 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
+
+import XCTest
+@testable import AudioProcessor
+
+/// Core tests for audio pipeline functionality.
+/// Split into smaller test groups for better organization.
+@available(macOS 15.0, *)
+final class AudioPipelineCoreTests: XCTestCase {
+    // MARK: - Test Setup
+    
+    var pipeline: AudioPipeline!
+    var mockSource: MockAudioSource!
+    var mockSink: MockAudioSink!
+    
+    override func setUp() {
+        super.setUp()
+        mockSource = MockAudioSource()
+        mockSink = MockAudioSink()
+        pipeline = AudioPipeline()
+    }
+    
+    override func tearDown() {
+        pipeline = nil
+        mockSource = nil
+        mockSink = nil
+        super.tearDown()
+    }
+    
+    // MARK: - Basic Pipeline Configuration Tests
+    
+    /// Tests that the pipeline can be initialized properly
+    func testPipelineInitialization() {
+        XCTAssertNotNil(pipeline, "Pipeline should be created successfully")
+        XCTAssertEqual(pipeline.nodes.count, 0, "Pipeline should start with no nodes")
+        XCTAssertEqual(pipeline.connections.count, 0, "Pipeline should start with no connections")
+    }
+    
+    /// Tests adding and retrieving nodes from the pipeline
+    func testAddingAndRetrievingNodes() {
+        let node1 = PassthroughNode(id: "node1")
+        let node2 = PassthroughNode(id: "node2")
+        
+        pipeline.addNode(node1)
+        pipeline.addNode(node2)
+        
+        XCTAssertEqual(pipeline.nodes.count, 2, "Pipeline should have 2 nodes")
+        XCTAssertTrue(pipeline.nodes.contains(where: { $0.id == "node1" }), "Pipeline should contain node1")
+        XCTAssertTrue(pipeline.nodes.contains(where: { $0.id == "node2" }), "Pipeline should contain node2")
+        
+        XCTAssertEqual(pipeline.nodeWithID("node1")?.id, "node1", "Should retrieve node1 by ID")
+        XCTAssertEqual(pipeline.nodeWithID("node2")?.id, "node2", "Should retrieve node2 by ID")
+        XCTAssertNil(pipeline.nodeWithID("nonexistent"), "Should return nil for nonexistent node ID")
+    }
+    
+    /// Tests connecting nodes in the pipeline
+    func testConnectingNodes() {
+        let node1 = PassthroughNode(id: "node1")
+        let node2 = PassthroughNode(id: "node2")
+        
+        pipeline.addNode(node1)
+        pipeline.addNode(node2)
+        
+        XCTAssertNoThrow(try pipeline.connect(from: node1, to: node2), "Connecting nodes should not throw")
+        XCTAssertEqual(pipeline.connections.count, 1, "Pipeline should have 1 connection")
+        
+        guard let connection = pipeline.connections.first else {
+            XCTFail("Connection should exist")
+            return
+        }
+        
+        XCTAssertEqual(connection.sourceID, "node1", "Connection source should be node1")
+        XCTAssertEqual(connection.destinationID, "node2", "Connection destination should be node2")
+    }
+    
+    /// Tests removing nodes from the pipeline
+    func testRemovingNodes() {
+        let node1 = PassthroughNode(id: "node1")
+        let node2 = PassthroughNode(id: "node2")
+        let node3 = PassthroughNode(id: "node3")
+        
+        pipeline.addNode(node1)
+        pipeline.addNode(node2)
+        pipeline.addNode(node3)
+        
+        XCTAssertNoThrow(try pipeline.connect(from: node1, to: node2), "Connecting nodes should not throw")
+        XCTAssertNoThrow(try pipeline.connect(from: node2, to: node3), "Connecting nodes should not throw")
+        
+        pipeline.removeNode(withID: "node2")
+        
+        XCTAssertEqual(pipeline.nodes.count, 2, "Pipeline should have 2 nodes after removal")
+        XCTAssertNil(pipeline.nodeWithID("node2"), "Removed node should not be retrievable")
+        XCTAssertEqual(pipeline.connections.count, 0, "All connections involving removed node should be removed")
+    }
+    
+    // MARK: - Pipeline Validation Tests
+    
+    /// Tests that the pipeline validates connections properly
+    func testPipelineValidation() {
+        let source = mockSource
+        let sink = mockSink
+        let processor = GainNode(id: "gain", gain: 2.0)
+        
+        pipeline.addNode(source)
+        pipeline.addNode(processor)
+        pipeline.addNode(sink)
+        
+        XCTAssertNoThrow(try pipeline.connect(from: source, to: processor))
+        XCTAssertNoThrow(try pipeline.connect(from: processor, to: sink))
+        
+        XCTAssertNoThrow(try pipeline.validate(), "Valid pipeline should pass validation")
+    }
+    
+    /// Tests that the pipeline detects cycles
+    func testPipelineDetectsCycles() {
+        let node1 = PassthroughNode(id: "node1")
+        let node2 = PassthroughNode(id: "node2")
+        let node3 = PassthroughNode(id: "node3")
+        
+        pipeline.addNode(node1)
+        pipeline.addNode(node2)
+        pipeline.addNode(node3)
+        
+        XCTAssertNoThrow(try pipeline.connect(from: node1, to: node2))
+        XCTAssertNoThrow(try pipeline.connect(from: node2, to: node3))
+        XCTAssertNoThrow(try pipeline.connect(from: node3, to: node1))
+        
+        XCTAssertThrowsError(try pipeline.validate()) { error in
+            XCTAssertEqual(error as? AudioPipelineError, .cyclicalConnection, "Should detect cyclical connection")
+        }
+    }
+}
+
 import XCTest
 import Combine
 import AVFoundation
