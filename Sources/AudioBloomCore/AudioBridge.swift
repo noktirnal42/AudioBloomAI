@@ -8,7 +8,66 @@ import QuartzCore
 import MetalKit
 import Logging
 
-/// Bridge connecting audio data providers to ML processors
+// MARK: - Supporting Types and Protocols
+
+/// Audio data structure
+public struct AudioData: Sendable {
+    /// Frequency spectrum data
+    public let frequencyData: [Float]
+    
+    /// Audio level data (left and right channels)
+    public let levels: (left: Float, right: Float)
+    
+    /// Timestamp of the data
+    public let timestamp: Date
+    
+    /// Initializes a new audio data instance
+    /// - Parameters:
+    ///   - frequencyData: Frequency spectrum data
+    ///   - levels: Audio level data
+    ///   - timestamp: Timestamp of the data
+    public init(frequencyData: [Float], levels: (left: Float, right: Float), timestamp: Date = Date()) {
+        self.frequencyData = frequencyData
+        self.levels = levels
+        self.timestamp = timestamp
+    }
+}
+
+/// Visualization data structure
+public struct VisualizationData: Sendable {
+    /// Values to visualize (typically frequency spectrum)
+    public let values: [Float]
+    
+    /// Whether this data represents a significant event
+    public let isSignificantEvent: Bool
+    
+    /// Timestamp of the data
+    public let timestamp: Date
+    
+    /// Initializes a new visualization data instance
+    /// - Parameters:
+    ///   - values: Values to visualize
+    ///   - isSignificantEvent: Whether this is a significant event
+    ///   - timestamp: Timestamp of the data
+    public init(values: [Float], isSignificantEvent: Bool = false, timestamp: Date = Date()) {
+        self.values = values
+        self.isSignificantEvent = isSignificantEvent
+        self.timestamp = timestamp
+    }
+}
+
+/// Protocol for audio data publishers
+public protocol AudioDataPublisher: AnyObject, Sendable {
+    /// Publisher for audio data
+    var audioDataPublisher: AnyPublisher<AudioData, Never> { get }
+    
+    /// Publishes new audio data
+    /// - Parameters:
+    ///   - frequencyData: The frequency spectrum data
+    ///   - levels: The audio level data
+    func publish(frequencyData: [Float], levels: (Float, Float))
+}
+
 /// Protocol for ML processor that generates visualization data
 public protocol MLProcessorProtocol: AnyObject, Sendable {
     /// Publisher for visualization data
@@ -19,6 +78,46 @@ public protocol MLProcessorProtocol: AnyObject, Sendable {
     /// - Throws: Error if processing fails
     func processAudioData(_ audioData: [Float]) async throws
 }
+
+/// Settings for audio bridge configuration
+public struct AudioBridgeSettings: Sendable {
+    /// Whether to apply Neural Engine optimizations
+    public var useNeuralEngine: Bool = true
+    
+    /// Optimization level for processing
+    public var optimizationLevel: OptimizationLevel = .balanced
+    
+    /// Buffer size for audio processing
+    public var bufferSize: Int = 1024
+    
+    /// Optimization level for audio processing
+    public enum OptimizationLevel: Sendable {
+        /// Prioritize efficiency (lower power usage)
+        case efficiency
+        
+        /// Balance efficiency and quality
+        case balanced
+        
+        /// Prioritize quality (higher power usage)
+        case quality
+    }
+    
+    /// Initializes with default settings
+    public init() {}
+    
+    /// Initializes with custom settings
+    /// - Parameters:
+    ///   - useNeuralEngine: Whether to use Neural Engine
+    ///   - optimizationLevel: Processing optimization level
+    ///   - bufferSize: Audio buffer size
+    public init(useNeuralEngine: Bool, optimizationLevel: OptimizationLevel, bufferSize: Int) {
+        self.useNeuralEngine = useNeuralEngine
+        self.optimizationLevel = optimizationLevel
+        self.bufferSize = bufferSize
+    }
+}
+
+// MARK: - Audio Bridge Implementation
 
 /// Bridge connecting audio data providers to ML processors
 public actor AudioBridge: Sendable {

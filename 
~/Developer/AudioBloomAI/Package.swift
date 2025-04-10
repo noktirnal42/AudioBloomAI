@@ -27,8 +27,23 @@
            resources: [
                 .copy("Resources")
             resources: [
-                .copy("Resources"),
+            dependencies: ["MLEngine            dependencies: ["AudioBloomUI"],
+            exclude: ["README.md"],
+            resources: [
+                .copy("Resources")
+            ]
+            resources: [
+                .copy("Resources")
+            ]
+"],
+            resources: [
+                .copy("Resources")
+            ]
+   .copy("Resources"),
                 .copy("TestResources")
             ]
-esources")
+              .copy("TestResources")
             ]
+    ],
+    swiftLanguageModes: [.c]
+)

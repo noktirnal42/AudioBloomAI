@@ -21,55 +21,55 @@
     private var frameCount: Int = 0
     
     /// Total processing time (seconds)
-    private var totalProcessingTime: Double = 0
+public actor AudioBridge: Sendable {
+    // MARK: - Types
     
-    /// Recent processing times (seconds)
-    private var recentProcessingTimes: [Double] = []
-    
-    /// Maximum number of recent times to track
-    private let maxRecentTimes = 30
-    
-    /// Significant events detected
-    private var significantEventCount: Int = 0
-    
-    /// Errors encountered
-    private var errorCount: Int = 0
-    
-    /// Tracking start time
-    private var trackingStartTime: CFAbsoluteTime = CFAbsoluteTimeGetCurrent()
-    // MARK: - Initialization
-    
-    // MARK: - Private Methods
-    
-    /// Updates the connection state and notifies listeners
-    private func updateConnectionState(_ newState: ConnectionState) {
-        // In an actor, we don't need explicit locking for internal state
-        connectionState = newState
-        
-        // Notify observers of state change
-        Task { @MainActor in
-            NotificationCenter.default.post(
-                name: .audioBridgeStateChanged,
-                object: self,
-                userInfo: ["state": newState]
-            )
-        }
-        
-        // Update metrics if appropriate
-        if newState == .active {
-            updatePerformanceMetrics()
-        }
-    }
-        
-        // Ensure dis    /// Subject for visualization data
-    private let visualizationSubject = PassthroughSubject<VisualizationData, Never>()
-    
-    /// Publisher for visualization data
-    public nonisolated var visualizationPublisher: AnyPublisher<VisualizationData, Never> {
-        return visualizationSubject.eraseToAnyPublisher()
+    /// Connection state of the bridge
+    public enum ConnectionState: String, Sendable {
+        case disconnected
+        case connecting
+        case connected
+        case active
+        case inactive
+        case error
     }
     
-    /// Current performance metrics
+    /// Errors that can occur in the audio bridge
+    public enum AudioBridgeError: Error, CustomStringConvertible, Sendable {
+        case dataConversionFailed
+        case connectionFailed(String)
+        case streamingFailed(String)
+        case processingFailed(String)
+        
+        public var description: String {
+            switch self {
+            case .dataConversionFailed: 
+                return "Failed to convert audio data"
+            case .connectionFailed(let details):
+                return "Connection failed: \(details)"
+            case .streamingFailed(let details):
+                return "Streaming failed: \(details)"
+            case .processingFailed(let details):
+                return "Processing failed: \(details)"
+            }
+        }
+    }
+    
+    /// Performance metrics for the audio bridge
+    public struct PerformanceMetrics: Sendable {
+        /// Frames processed per second
+        public var framesPerSecond: Double = 0
+        /// Events detected per minute
+        public var eventsPerMinute: Double = 0
+        /// Errors per minute
+        public var errorRate: Double = 0
+        /// Average processing time per frame (ms)
+        public var averageProcessingTime: Double = 0
+        /// Efficiency of audio conversion (0-1)
+        public var conversionEfficiency: Double = 0
+        
+        public init() {}
+    }
     public private(set) var performanceMetrics = PerformanceMetrics()
     
     /// Performance tracker for monitoring
@@ -110,27 +110,26 @@
         }
     }
     /// - Parameter audioData: The audio data to process
-    private func processAudioData(_ audioData: AudioData) async {
-        // Skip processing if not active
-        guard connectionState == .active else { return }
-    public init(mlProcessor: MLProcessorProtocol) {
-        self.mlProcessor = mlProcessor
-        self.formatConverter = FormatConverter()
-        
-        // Initialize FFT
-        self.fftSetup = vDSP_DFT_zop_CreateSetup(
-            nil,
-            vDSP_Length(fftSize),
-            vDSP_DFT_Direction.FORWARD
-        )
-        
-        // Create window buffer
-        self.windowBuffer = [Float](repeating: 0, count: fftSize)
-        var window = self.windowBuffer
-        vDSP_hann_window(&window, vDSP_Length(fftSize), Int32(vDSP_HANN_NORM))
-        self.windowBuffer = window
+    private let formatConverter: FormatConverter
+    
+    /// Audio ML processor for AI analysis
+    private let mlProcessor: MLProcessorProtocol
+    
+    /// Subject for visualization data
+    private let visualizationSubject = PassthroughSubject<VisualizationData, Never>()
+    
+    /// Publisher for visualization data
+    public nonisolated var visualizationPublisher: AnyPublisher<VisualizationData, Never> {
+        return visualizationSubject.eraseToAnyPublisher()
     }
     
+    /// Current performance metrics
+    public private(set) var performanceMetrics = PerformanceMetrics()
+    
+    /// Performance tracker for monitoring
+    private let performanceTracker = PerformanceTracker()
+    
+    // MARK: - Initialization
     // Called after initialization
     public func setupSubscriptions() async {
         // Subscribe to visualization data from ML processor
@@ -161,38 +160,35 @@
     
     // MARK: - Connection Methods
     
-    /// Connects the bridge to an audio provider and starts processing
-    /// - Parameter provider: The audio data provider
-    public func connect(to provider: AudioDataProvider) async {
-        guard connectionState != .connected && connectionState != .active else {
-            logger.warning("Already connected to audio provider")
-            return
+    /// Initializes the bridge with an ML processor
+    /// - Parameter mlProcessor: The ML processor to use for analysis
+    public init(mlProcessor: MLProcessorProtocol) {
+        self.mlProcessor = mlProcessor
+        self.formatConverter = FormatConverter()
+        
+        // Initialize FFT
+        self.fftSetup = vDSP_DFT_zop_CreateSetup(
+            nil,
+            vDSP_Length(fftSize),
+            vDSP_DFT_Direction.FORWARD
+        )
+        
+        // Create window buffer
+        self.windowBuffer = [Float](repeating    deinit {
+        // Clean up subscriptions
+        audioDataSubscription?.cancel()
+        mlVisualizationSubscription?.cancel()
+        
+        // Clean up FFT resources
+        if let fftSetup = fftSetup {
+            vDSP_DFT_DestroySetup(fftSetup)
         }
-        
-        logger.info("Connecting to audio provider")
-        updateConnectionState(.connecting)
-        
-        // Store provider reference
-        audioProvider = provider
-        
-        // Subscribe to audio data
-        audioDataSubscription = provider.audioDataPublisher
-            .sink { [weak self] audioData in
-                guard let self = self else { return }
-                Task {
-                    await self.processAudioData(audioData)
-                }
-            }
-        
-        updateConnectionState(.connected)
-        
-        // Activate immediately
-        await activate()
     }
     
-    /// Disconnects the bridge from the audio provider
-    public func disconnect() async {
-        guard connectionState != .disconnected else {
+    /// Set up ML processor subscription
+    public func setupSubscriptions() async {
+        // Subscribe to visualization data from ML processor
+        mlVisualizationSubscription = mlProcessor.visualizationDataPublisher
             return
         }
         

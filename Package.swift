@@ -55,7 +55,7 @@ let package = Package(
                 "MLEngine",
                 "AudioBloomUI"
             ],
-            exclude: ["README.md"],
+            exclude: ["README.md", "SupportFiles/Info.plist"],
             resources: [
                 .copy("Resources")
             ]
