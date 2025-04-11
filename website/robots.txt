@@ -1,0 +1,7 @@
+# Allow all web crawlers to access all content
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://noktirnal42.github.io/AudioBloomAI/sitemap.xml
+

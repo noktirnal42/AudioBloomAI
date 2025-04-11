@@ -1,0 +1,186 @@
+/* Global Styles */
+:root {
+    --primary-color: #007aff;
+    --secondary-color: #5ac8fa;
+    --dark-color: #1d1d1f;
+    --light-color: #f5f5f7;
+    --gray-color: #86868b;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    line-height: 1.6;
+    color: var(--dark-color);
+    overflow-x: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+}
+
+/* Navigation */
+.navbar {
+    transition: all 0.3s ease;
+    padding: 1rem 0;
+}
+
+.navbar-brand {
+    font-weight: 700;
+    font-size: 1.5rem;
+}
+
+/* Hero Section */
+.hero-section {
+    position: relative;
+    background: linear-gradient(to right, #000428, #004e92);
+    height: 100vh;
+    min-height: 650px;
+    display: flex;
+    align-items: center;
+    padding-top: 70px;
+    overflow: hidden;
+}
+
+.hero-section:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: url('https://images.unsplash.com/photo-1558346490-a72e53ae2d4f?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80') no-repeat center center/cover;
+    opacity: 0.2;
+    z-index: 0;
+}
+
+.hero-section .container {
+    position: relative;
+    z-index: 1;
+}
+
+.text-white-75 {
+    color: rgba(255, 255, 255, 0.75);
+}
+
+/* Feature Cards */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.12);
+}
+
+.card-title {
+    color: var(--primary-color);
+}
+
+/* Section Styling */
+.section-heading {
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--dark-color);
+}
+
+.divider {
+    height: 0.2rem;
+    max-width: 3.25rem;
+    margin: 1.5rem auto;
+    background-color: var(--primary-color);
+    opacity: 1;
+}
+
+/* Documentation Links */
+.list-group-item-action:hover {
+    background-color: rgba(0, 122, 255, 0.05);
+}
+
+.list-group-item h5 {
+    color: var(--primary-color);
+}
+
+/* Installation Section */
+pre {
+    border-radius: 5px;
+    margin: 1rem 0;
+}
+
+code {
+    font-family: 'SF Mono', 'Courier New', Courier, monospace;
+}
+
+/* Call to Action */
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: #0062cc;
+    border-color: #0062cc;
+}
+
+/* Footer */
+footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+footer a {
+    color: var(--primary-color);
+}
+
+footer a:hover {
+    color: #0062cc;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+    .hero-section {
+        height: auto;
+        min-height: 500px;
+        padding: 120px 0 80px;
+    }
+}
+
+@media (max-width: 768px) {
+    .navbar-brand {
+        font-size: 1.2rem;
+    }
+    
+    h1 {
+        font-size: 2.5rem;
+    }
+    
+    h2 {
+        font-size: 1.8rem;
+    }
+    
+    .hero-section {
+        min-height: 450px;
+        padding: 100px 0 60px;
+    }
+}
+
+@media (max-width: 576px) {
+    h1 {
+        font-size: 2rem;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+    
+    .btn-lg {
+        padding: 0.5rem 1rem;
+        font-size: 1rem;
+    }
+    
+    .hero-section {
+        min-height: 400px;
+    }
+}
+
