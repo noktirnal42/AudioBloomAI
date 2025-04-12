@@ -1,3 +1,104 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
+
+import Foundation
+import os.log
+import MetricKit
+
+/// Performance metric data structure
+@available(macOS 15.0, *)
+public struct PerformanceMetric: Sendable, Identifiable, Hashable {
+    /// Unique identifier for the metric
+    public let id: UUID = UUID()
+    
+    /// Operation name associated with the metric
+    public let operation: String
+    
+    /// Start timestamp
+    public let startTime: Date
+    
+    /// End timestamp (nil if operation is still in progress)
+    public let endTime: Date?
+    
+    /// Duration in seconds (nil if operation is still in progress)
+    public var duration: TimeInterval? {
+        guard let end = endTime else { return nil }
+        return end.timeIntervalSince(startTime)
+    }
+    
+    /// Custom tags for additional categorization
+    public let tags: [String]
+    
+    /// Additional metadata
+    public let metadata: [String: String]
+    
+    /// Create a new performance metric
+    /// - Parameters:
+    ///   - operation: Operation name
+    ///   - startTime: Start timestamp
+    ///   - endTime: End timestamp (optional)
+    ///   - tags: Custom tags (optional)
+    ///   - metadata: Additional metadata (optional)
+    public init(
+        operation: String,
+        startTime: Date = Date(),
+        endTime: Date? = nil,
+        tags: [String] = [],
+        metadata: [String: String] = [:]
+    ) {
+        self.operation = operation
+        self.startTime = startTime
+        self.endTime = endTime
+        self.tags = tags
+        self.metadata = metadata
+    }
+    
+    /// Create a completed metric by adding an end time to an in-progress metric
+    /// - Parameter endTime: End timestamp
+    /// - Returns: New metric with end time
+    public func withEndTime(_ endTime: Date) -> PerformanceMetric {
+        return PerformanceMetric(
+            operation: operation,
+            startTime: startTime,
+            endTime: endTime,
+            tags: tags,
+            metadata: metadata
+        )
+    }
+}
+
+/// Statistics for performance metrics
+@available(macOS 15.0, *)
+public struct PerformanceStatistics: Sendable {
+    /// Total number of operations tracked
+    public let count: Int
+    
+    /// Average duration in seconds
+    public let averageDuration: TimeInterval
+    
+    /// Minimum duration in seconds
+    public let minDuration: TimeInterval
+    
+    /// Maximum duration in seconds
+    public let maxDuration: TimeInterval
+    
+    /// 90th percentile duration in seconds
+    public let percentile90: TimeInterval
+    
+    /// 95th percentile duration in seconds
+    public let percentile95: TimeInterval
+    
+    /// 99th percentile duration in seconds
+    public let percentile99: TimeInterval
+    
+    /// Standard deviation of durations
+    public let standardDeviation: TimeInterval
+}
+
+/// Performance monitor for tracking operation timing and metrics
+@available(
+
 import Foundation
 import SwiftUI
 import Combine
