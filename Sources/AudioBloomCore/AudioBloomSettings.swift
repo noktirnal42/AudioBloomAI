@@ -1,3 +1,114 @@
+// Swift 6 optimized implementation
+// Requires macOS 15.0 or later
+// Updated for modern concurrency
+
+import Foundation
+import Combine
+
+// Property wrapper for storing settings in UserDefaults
+@propertyWrapper
+public struct SettingStorage<T> {
+    private let key: String
+    private let defaultValue: T
+    private let userDefaults: UserDefaults
+    
+    public init(key: String, defaultValue: T, userDefaults: UserDefaults = .standard) {
+        self.key = key
+        self.defaultValue = defaultValue
+        self.userDefaults = userDefaults
+    }
+    
+    public var wrappedValue: T {
+        get {
+            return userDefaults.object(forKey: key) as? T ?? defaultValue
+        }
+        set {
+            userDefaults.set(newValue, forKey: key)
+        }
+    }
+    
+    public var projectedValue: Binding<T> {
+        return Binding(
+            get: { self.wrappedValue },
+            set: { self.wrappedValue = $0 }
+        )
+    }
+}
+
+@propertyWrapper
+public struct BloomIntensity {
+    private let key = "bloom_intensity"
+    private let defaultValue: Double = 0.5
+    private let userDefaults: UserDefaults
+    
+    public init(wrappedValue: Double = 0.5, userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+        // Set initial value if not already present
+        if userDefaults.object(forKey: key) == nil {
+            userDefaults.set(wrappedValue, forKey: key)
+        }
+    }
+    
+    public var wrappedValue: Double {
+        get { userDefaults.double(forKey: key) }
+        set { userDefaults.set(newValue, forKey: key) }
+    }
+    
+    // Provide a projected value for SwiftUI binding
+    public var projectedValue: Binding<Double> {
+        return Binding(
+            get: { self.wrappedValue },
+            set: { self.wrappedValue = $0 }
+        )
+    }
+}
+
+// Helper struct for typed bindings
+public struct Binding<Value> {
+    private let getter: () -> Value
+    private let setter: (Value) -> Void
+    
+    public init(get: @escaping () -> Value, set: @escaping (Value) -> Void) {
+        self.getter = get
+        self.setter = set
+    }
+    
+    public func get() -> Value {
+        return getter()
+    }
+    
+    public func set(_ newValue: Value) {
+        setter(newValue)
+    }
+    
+    // Transform binding to a new type
+    public func map<NewValue>(
+        transform: @escaping (Value) -> NewValue,
+        untransform: @escaping (NewValue) -> Value
+    ) -> Binding<NewValue> {
+        return Binding<NewValue>(
+            get: { transform(self.getter()) },
+            set: { self.setter(untransform($0)) }
+        )
+    }
+}
+
+@available(macOS 15.0, *)
+public class AudioBloomSettings: ObservableObject {
+    // UserDefaults keys
+    public enum Keys: String, CaseIterable {
+        case bloomIntensity = "bloom_intensity"
+        case visualizationMode = "visualization_mode"
+        case audioProcessingEnabled = "audio_processing_enabled"
+        case spectralAnalysisLevel = "spectral_analysis_level"
+        case temporalSmoothingFactor = "temporal_smoothing_factor"
+        
+        // Add more settings keys as needed
+    }
+    
+    // Published properties with UserDefaults backing
+    @Published @BloomIntensity
+
 //
 // AudioBloomSettings.swift
 // Settings manager for AudioBloomAI
