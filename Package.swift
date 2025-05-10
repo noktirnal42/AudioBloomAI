@@ -55,9 +55,9 @@ let package = Package(
                 "MLEngine",
                 "AudioBloomUI"
             ],
-            exclude: ["README.md"],
+            exclude: ["README.md", "SupportFiles/Info.plist"],
             resources: [
-                .process("Resources")
+                .copy("Resources")
             ]
         ),
         
@@ -69,7 +69,10 @@ let package = Package(
                 .product(name: "Numerics", package: "swift-numerics"),
                 .product(name: "Logging", package: "swift-log")
             ],
-            exclude: ["README.md"]
+            exclude: ["README.md"],
+            resources: [
+                .process("Resources")
+            ]
         ),
         
         // Audio processing module
@@ -81,6 +84,9 @@ let package = Package(
                 .product(name: "AudioKit", package: "AudioKit")
             ],
             exclude: ["README.md"],
+            resources: [
+                .process("Resources")
+            ],
             swiftSettings: [
                 // Any swift settings would go here
             ],
@@ -99,9 +105,9 @@ let package = Package(
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "Numerics", package: "swift-numerics")
             ],
-            exclude: ["README.md"], // Removed MetalRenderer.swift from exclusions
+            exclude: ["README.md"],
             resources: [
-                .process("Resources/Shaders")
+                .copy("Resources/Shaders")
             ],
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
@@ -127,7 +133,7 @@ let package = Package(
             ],
             exclude: ["README.md"],
             resources: [
-                .process("Resources/Models")
+                .process("Resources")
             ],
             cSettings: [
                 .unsafeFlags(["-fmodules"], .when(platforms: [.macOS]))
@@ -152,7 +158,11 @@ let package = Package(
                 "Visualizer",
                 .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
             ],
-            exclude: ["README.md"], // Removed PresetControlsView.swift from exclusions
+            exclude: ["README.md"],
+            resources: [
+                .process("Resources/Assets"),
+                .copy("Views/Resources")
+            ],
             swiftSettings: [
                 // Any swift settings would go here
             ],
@@ -165,33 +175,52 @@ let package = Package(
         // Test targets
         .testTarget(
             name: "AudioBloomTests",
-            dependencies: ["AudioBloomCore"],
-            path: "Tests/AudioBloomTests",
-            exclude: ["README.md"]
+            dependencies: [
+                "AudioBloomCore",
+                "AudioProcessor",
+                "Visualizer",
+                "MLEngine",
+                "AudioBloomUI"
+            ],
+            exclude: ["README.md"],
+            resources: [
+                .copy("Resources"),
+                .copy("TestResources")
+            ]
         ),
         .testTarget(
             name: "AudioProcessorTests",
             dependencies: ["AudioProcessor"],
-            path: "Tests/AudioProcessorTests",
-            exclude: ["README.md"]
+            exclude: ["README.md"],
+            resources: [
+                .copy("Resources")
+            ]
         ),
         .testTarget(
             name: "VisualizerTests",
             dependencies: ["Visualizer"],
-            path: "Tests/VisualizerTests",
-            exclude: ["README.md"]
+            exclude: ["README.md"],
+            resources: [
+                .copy("Resources")
+            ]
         ),
         .testTarget(
             name: "MLEngineTests",
             dependencies: ["MLEngine"],
-            path: "Tests/MLEngineTests",
-            exclude: ["README.md"]
+            exclude: ["README.md"],
+            resources: [
+                .copy("Resources"),
+                .copy("TestResources")
+            ]
         ),
         .testTarget(
             name: "AudioBloomUITests",
             dependencies: ["AudioBloomUI"],
-            path: "Tests/AudioBloomUITests"
+            exclude: ["README.md"],
+            resources: [
+                .copy("Resources")
+            ]
         )
     ],
-    swiftLanguageModes: [.version("6")]
+    swiftLanguageVersions: [.v6]
 )
