@@ -10,10 +10,15 @@ let package = Package(
         .macOS(.v15) // Specific requirement for macOS 15+
     ],
     products: [
-        // Main executable application
+        // Main executable application (legacy, currently unstable)
         .executable(
             name: "AudioBloomApp",
             targets: ["AudioBloomApp"]
+        ),
+        // Minimal working app
+        .executable(
+            name: "AudioBloomLite",
+            targets: ["AudioBloomLite"]
         ),
         .library(
             name: "AudioBloomCore",
@@ -45,20 +50,20 @@ let package = Package(
         .package(url: "https://github.com/AudioKit/AudioKit", from: "5.6.5")
     ],
     targets: [
-        // Main application target
+        // Main application target (legacy)
         .executableTarget(
             name: "AudioBloomApp",
             dependencies: [
-                "AudioBloomCore",
-                "AudioProcessor",
-                "Visualizer",
-                "MLEngine",
-                "AudioBloomUI"
+                "Visualizer"
             ],
-            exclude: ["README.md"],
-            resources: [
-                .process("Resources")
-            ]
+            exclude: ["README.md", "Resources/SupportFiles/Info.plist"]
+        ),
+        
+        // Minimal working app target
+        .executableTarget(
+            name: "AudioBloomLite",
+            dependencies: [],
+            path: "Sources/AudioBloomLite"
         ),
         
         // Core shared functionality
@@ -95,11 +100,10 @@ let package = Package(
         .target(
             name: "Visualizer",
             dependencies: [
-                "AudioBloomCore",
                 .product(name: "Algorithms", package: "swift-algorithms"),
                 .product(name: "Numerics", package: "swift-numerics")
             ],
-            exclude: ["README.md"], // Removed MetalRenderer.swift from exclusions
+            exclude: ["README.md", "Processing/AudioVisualizerProcessor.swift"],
             resources: [
                 .process("Resources/Shaders")
             ],

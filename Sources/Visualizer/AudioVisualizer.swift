@@ -3,176 +3,71 @@ import Metal
 import MetalKit
 import SwiftUI
 import Combine
-import AudioBloomCore
-
 #if canImport(AudioProcessor)
 import AudioProcessor
 #endif
 
 /// Main public class for the audio visualizer system
 public class AudioVisualizer {
-    // The shared visualizer instance
-    private static var shared: AudioVisualizer?
-    
-    // The underlying renderer for Metal-based visualization
+    private static var sharedInstance: AudioVisualizer?
     private var renderer: MetalRenderer?
-    
-    // Subscriptions for audio data
     private var audioSubscriptions = Set<AnyCancellable>()
-    
-    /// Initialize the audio visualizer system
+
     public init() {
-        do {
-            renderer = try MetalRenderer()
-        } catch {
-            print("Failed to initialize Metal renderer: \(error.localizedDescription)")
-        }
-        
-        // Configure default theme and visualization mode
+        do { renderer = try MetalRenderer() } catch { print("Metal init error: \(error)") }
         setTheme(.classic)
         setVisualizationMode(.spectrum)
     }
-    
-    /// Get or create the shared visualizer instance
+
     public static func shared() -> AudioVisualizer {
-        if shared == nil {
-            shared = AudioVisualizer()
-        }
-        return shared!
+        if let s = sharedInstance { return s }
+        let s = AudioVisualizer(); sharedInstance = s; return s
     }
-    
-    /// Create a SwiftUI view for the visualizer
-    /// - Returns: A SwiftUI view for the audio visualizer
-    public func createView() -> some View {
-        AudioVisualizerView(visualizer: self)
+
+    public func createView() -> some View { AudioVisualizerView(visualizer: self) }
+
+    public func setVisualizationMode(_ mode: VisualizationMode) { renderer?.setVisualizationMode(mode) }
+    public func setTheme(_ theme: Theme) { renderer?.setTheme(theme) }
+    public func setCustomColors(primary: SIMD4<Float>, secondary: SIMD4<Float>, background: SIMD4<Float>, accent: SIMD4<Float>) {
+        renderer?.setCustomColors(primary: primary, secondary: secondary, background: background, accent: accent)
     }
-    
-    // MARK: - Public Configuration Methods
-    
-    /// Set the visualization mode
-    /// - Parameter mode: The visualization mode
-    public func setVisualizationMode(_ mode: VisualizationMode) {
-        renderer?.setVisualizationMode(mode)
+    public func setVisualizationParameters(sensitivity: Float = 0.8, motionIntensity: Float = 0.7, colorIntensity: Float = 0.8) {
+        renderer?.setVisualizationParameters(sensitivity: sensitivity, motionIntensity: motionIntensity, colorIntensity: colorIntensity)
     }
-    
-    /// Set the visualization theme
-    /// - Parameter theme: The visualization theme
-    public func setTheme(_ theme: Theme) {
-        renderer?.setTheme(theme)
-    }
-    
-    /// Set custom colors for visualization
-    /// - Parameters:
-    ///   - primary: Primary color
-    ///   - secondary: Secondary color
-    ///   - background: Background color
-    ///   - accent: Accent color
-    public func setCustomColors(primary: SIMD4<Float>, secondary: SIMD4<Float>,
-                              background: SIMD4<Float>, accent: SIMD4<Float>) {
-        renderer?.setCustomColors(primary: primary, secondary: secondary,
-                                background: background, accent: accent)
-    }
-    
-    /// Set visualization parameters
-    /// - Parameters:
-    ///   - sensitivity: Audio sensitivity (0.0-1.0)
-    ///   - motionIntensity: Motion intensity (0.0-1.0)
-    ///   - colorIntensity: Color intensity (0.0-1.0)
-    public func setVisualizationParameters(sensitivity: Float = 0.8,
-                                         motionIntensity: Float = 0.7,
-                                         colorIntensity: Float = 0.8) {
-        renderer?.setVisualizationParameters(sensitivity: sensitivity,
-                                           motionIntensity: motionIntensity,
-                                           colorIntensity: colorIntensity)
-    }
-    
-    // MARK: - Audio Processing Integration
-    
+
     #if canImport(AudioProcessor)
-    /// Connect to the audio processor for real-time updates
-    /// Connect to the audio processor for real-time updates
-    /// - Parameter audioProcessor: The audio processor instance
     public func connectToAudioProcessor(_ audioProcessor: AudioEngine) {
-        // Cancel existing subscriptions first
         audioSubscriptions.removeAll()
-        
-        // Subscribe to frequency data updates
         audioProcessor.frequencyDataPublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] frequencyData in
-                self?.renderer?.updateAudioData(frequencyData)
-            }
+            .sink { [weak self] data in self?.renderer?.updateAudioData(data) }
             .store(in: &audioSubscriptions)
-        
-        // Subscribe to audio level updates
         audioProcessor.audioLevelsPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] levels in
                 self?.renderer?.setAudioLevels(
-                    bass: levels.bass,
-                    mid: levels.mid,
-                    treble: levels.treble,
-                    left: levels.left,
-                    right: levels.right
+                    bass: levels.bass, mid: levels.mid, treble: levels.treble, left: levels.left, right: levels.right
                 )
             }
             .store(in: &audioSubscriptions)
-        
-        // Subscribe to beat detection
         audioProcessor.beatDetectionPublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] beatDetected in
+            .sink { [weak self] beat in
                 if let energy = audioProcessor.currentEnergy,
                    let pleasantness = audioProcessor.currentPleasantness,
                    let complexity = audioProcessor.currentComplexity {
-                    self?.renderer?.setNeuralParameters(
-                        energy: energy,
-                        pleasantness: pleasantness,
-                        complexity: complexity,
-                        beatDetected: beatDetected ? 1.0 : 0.0
-                    )
+                    self?.renderer?.setNeuralParameters(energy: energy, pleasantness: pleasantness, complexity: complexity, beatDetected: beat ? 1.0 : 0.0)
                 }
             }
             .store(in: &audioSubscriptions)
-        
-        print("AudioVisualizer successfully connected to AudioEngine")
     }
-    
-    /// Disconnect from audio processor and clean up resources
-    public func disconnectFromAudioProcessor() {
-        audioSubscriptions.removeAll()
-        print("AudioVisualizer disconnected from AudioEngine")
-    }
-    
-    // MARK: - Internal Methods for View Integration
-    
-    /// Internal method to render to a Metal drawable
-    /// - Parameters:
-    ///   - drawable: The Metal drawable to render to
-    ///   - renderPassDescriptor: The render pass descriptor
-    internal func render(to drawable: CAMetalDrawable, with renderPassDescriptor: MTLRenderPassDescriptor) {
-        renderer?.render(to: drawable, with: renderPassDescriptor)
-    }
-    
-    /// Internal method to update the viewport size
-    /// - Parameter size: The new viewport size
-    internal func updateViewportSize(_ size: CGSize) {
-        renderer?.setViewportSize(size)
-    }
-    
-    /// Manually update audio data (for testing or custom input)
-    /// - Parameter data: Array of audio frequency data (0.0-1.0)
-    public func updateAudioData(_ data: [Float]) {
-        renderer?.updateAudioData(data)
-    }
-    
-    /// Manually set audio levels (for testing or custom input)
-    /// - Parameters:
-    ///   - bass: Bass level (0.0-1.0)
-    ///   - mid: Mid level (0.0-1.0)
-    ///   - treble: Treble level (0.0-1.0)
-    ///   - left: Left channel level (0.0-1.0)
-    ///   - right: Right channel level (0.0-1.0)
+
+    public func disconnectFromAudioProcessor() { audioSubscriptions.removeAll() }
+    #endif
+
+    internal func render(to drawable: CAMetalDrawable, with renderPassDescriptor: MTLRenderPassDescriptor) { renderer?.render(to: drawable, with: renderPassDescriptor) }
+    internal func updateViewportSize(_ size: CGSize) { renderer?.setViewportSize(size) }
+    public func updateAudioData(_ data: [Float]) { renderer?.updateAudioData(data) }
     public func setAudioLevels(bass: Float, mid: Float, treble: Float, left: Float, right: Float) {
         renderer?.setAudioLevels(bass: bass, mid: mid, treble: treble, left: left, right: right)
     }
